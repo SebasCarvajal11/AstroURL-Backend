@@ -8,5 +8,6 @@
     <!-- Include all the changeset files here. Liquibase runs them in order. -->
     <include file="db/changelog/changesets/001-initial-schema.xml"/>
     <include file="db/changelog/changesets/002-add-updated_at-to-users.xml"/>
+    <include file="db/changelog/changesets/003-create-url-and-click-tables.xml"/>
 
 </databaseChangeLog>

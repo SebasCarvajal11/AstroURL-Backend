@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Changeset 1: Create the 'urls' table -->
+    <changeSet id="005-create-urls-table" author="dev.astrourl">
+        <createTable tableName="urls">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="slug" type="VARCHAR(10)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_urls_slug"/>
+            </column>
+            <column name="original_url" type="VARCHAR(2048)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expiration_date" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="password" type="VARCHAR(255)"/>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="true" foreignKeyName="fk_urls_users" referencedTableName="users" referencedColumnNames="id"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Explicit index for slug for performance, even though unique constraint creates one -->
+        <createIndex indexName="idx_urls_slug" tableName="urls">
+            <column name="slug"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Changeset 2: Create the 'clicks' table -->
+    <changeSet id="006-create-clicks-table" author="dev.astrourl">
+        <createTable tableName="clicks">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="url_id" type="BIGINT">
+                <constraints nullable="false" foreignKeyName="fk_clicks_urls" referencedTableName="urls" referencedColumnNames="id"/>
+            </column>
+            <column name="ip_address" type="VARCHAR(45)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="user_agent" type="VARCHAR(512)"/>
+            <column name="timestamp" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex indexName="idx_clicks_url_id" tableName="clicks">
+            <column name="url_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
