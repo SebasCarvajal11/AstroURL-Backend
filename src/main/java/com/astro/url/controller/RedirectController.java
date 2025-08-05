@@ -1,6 +1,7 @@
 package com.astro.url.controller;
 
 import com.astro.shared.exceptions.RateLimitExceededException;
+import com.astro.shared.utils.HttpServletRequestUtils;
 import com.astro.url.service.RateLimitingService;
 import com.astro.url.service.UrlService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,10 +21,11 @@ public class RedirectController {
 
     private final UrlService urlService;
     private final RateLimitingService rateLimitingService;
+    private final HttpServletRequestUtils requestUtils;
 
     @GetMapping("/r/{slug}")
     public ResponseEntity<Void> redirect(@PathVariable String slug, HttpServletRequest request) {
-        String ipAddress = request.getRemoteAddr();
+        String ipAddress = requestUtils.getClientIpAddress(request);
         if (!rateLimitingService.isRedirectAllowed(ipAddress)) {
             throw new RateLimitExceededException("Redirect rate limit exceeded.");
         }
