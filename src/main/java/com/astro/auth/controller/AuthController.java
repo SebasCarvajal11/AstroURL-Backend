@@ -2,6 +2,7 @@ package com.astro.auth.controller;
 
 import com.astro.auth.dto.LoginRequest;
 import com.astro.auth.dto.LoginResponse;
+import com.astro.auth.dto.RefreshTokenRequest;
 import com.astro.auth.dto.RegisterRequest;
 import com.astro.auth.service.AuthService;
 import com.astro.shared.dto.ApiResponse;
@@ -31,5 +32,11 @@ public class AuthController {
     public ResponseEntity<LoginResponse> loginUser(@Valid @RequestBody LoginRequest loginRequest) {
         LoginResponse loginResponse = authService.loginUser(loginRequest);
         return ResponseEntity.ok(loginResponse);
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<LoginResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        LoginResponse response = authService.refreshAccessToken(request.getRefreshToken());
+        return ResponseEntity.ok(response);
     }
 }

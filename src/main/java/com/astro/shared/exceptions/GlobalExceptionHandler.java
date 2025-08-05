@@ -19,6 +19,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(apiResponse, HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(TokenRefreshException.class)
+    public ResponseEntity<ApiResponse> handleTokenRefreshException(TokenRefreshException ex) {
+        ApiResponse apiResponse = new ApiResponse(false, ex.getMessage());
+        return new ResponseEntity<>(apiResponse, HttpStatus.FORBIDDEN);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
         ApiResponse apiResponse = new ApiResponse(false, ex.getMessage());

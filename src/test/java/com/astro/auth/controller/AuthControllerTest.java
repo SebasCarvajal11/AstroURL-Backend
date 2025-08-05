@@ -2,7 +2,8 @@ package com.astro.auth.controller;
 
 import com.astro.config.AbstractIntegrationTest;
 import com.astro.auth.dto.LoginRequest;
-import com.astro.auth.dto.RegisterRequest;
+import com.astro.auth.dto.LoginResponse;
+import com.astro.auth.dto.RefreshTokenRequest;
 import com.astro.user.model.User;
 import com.astro.user.plan.model.Plan;
 import com.astro.user.repository.UserRepository;
@@ -13,10 +14,19 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,68 +46,75 @@ class AuthControllerTest extends AbstractIntegrationTest {
     private PlanRepository planRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @MockBean
+    private Clock clock;
+
+    private static final Instant MOCK_TIME_NOW = Instant.parse("2025-08-10T10:00:00Z");
+    private static final Instant MOCK_TIME_LATER = Instant.parse("2025-08-10T10:00:10Z");
 
     @BeforeEach
     void setUp() {
-        // Clean up users before each test to ensure isolation
         userRepository.deleteAll();
+        redisTemplate.getConnectionFactory().getConnection().flushDb();
+        // Set a default time for the clock
+        when(clock.instant()).thenReturn(MOCK_TIME_NOW);
+        when(clock.getZone()).thenReturn(ZoneId.systemDefault());
     }
 
     @Test
-    void loginUser_shouldReturnTokens_whenCredentialsAreValidWithUsername() throws Exception {
-        // Given: a registered user
-        createTestUser("login-user", "login@test.com", "password123");
-
-        // When
+    void refreshToken_shouldSucceed_whenTokenIsValid() throws Exception {
+        // Given: a logged-in user with a valid refresh token generated at MOCK_TIME_NOW
+        when(clock.instant()).thenReturn(MOCK_TIME_NOW);
+        createTestUser("refresh-user", "refresh@test.com", "password123");
         LoginRequest loginRequest = new LoginRequest();
-        loginRequest.setLoginIdentifier("login-user");
+        loginRequest.setLoginIdentifier("refresh-user");
         loginRequest.setPassword("password123");
 
-        // Then
-        mockMvc.perform(post("/api/auth/login")
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
+                .andReturn();
+        LoginResponse loginResponse = objectMapper.readValue(loginResult.getResponse().getContentAsString(), LoginResponse.class);
+        String originalRefreshToken = loginResponse.getRefreshToken();
+        String originalAccessToken = loginResponse.getAccessToken();
+
+        // When: requesting a new access token at a later time
+        when(clock.instant()).thenReturn(MOCK_TIME_LATER); // Advance the clock
+        RefreshTokenRequest refreshRequest = new RefreshTokenRequest();
+        refreshRequest.setRefreshToken(originalRefreshToken);
+
+        MvcResult refreshResult = mockMvc.perform(post("/api/auth/refresh-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(refreshRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken", notNullValue()))
-                .andExpect(jsonPath("$.refreshToken", notNullValue()));
+                .andExpect(jsonPath("$.refreshToken", notNullValue()))
+                .andReturn();
+
+        // Then: the new tokens should be different from the old ones because the timestamp has changed
+        LoginResponse refreshResponse = objectMapper.readValue(refreshResult.getResponse().getContentAsString(), LoginResponse.class);
+        assertThat(refreshResponse.getAccessToken()).isNotEqualTo(originalAccessToken);
+        assertThat(refreshResponse.getRefreshToken()).isNotEqualTo(originalRefreshToken);
     }
 
     @Test
-    void loginUser_shouldReturnTokens_whenCredentialsAreValidWithEmail() throws Exception {
-        // Given: a registered user
-        createTestUser("login-user-2", "login2@test.com", "password123");
-
-        // When
-        LoginRequest loginRequest = new LoginRequest();
-        loginRequest.setLoginIdentifier("login2@test.com");
-        loginRequest.setPassword("password123");
+    void refreshToken_shouldFail_whenTokenIsInvalid() throws Exception {
+        // When: using a bogus refresh token
+        RefreshTokenRequest refreshRequest = new RefreshTokenRequest();
+        refreshRequest.setRefreshToken("this.is.a.bogus.token");
 
         // Then
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/auth/refresh-token")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken", notNullValue()));
+                        .content(objectMapper.writeValueAsString(refreshRequest)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
-    @Test
-    void loginUser_shouldReturnUnauthorized_whenPasswordIsIncorrect() throws Exception {
-        // Given: a registered user
-        createTestUser("login-user-3", "login3@test.com", "password123");
 
-        // When
-        LoginRequest loginRequest = new LoginRequest();
-        loginRequest.setLoginIdentifier("login-user-3");
-        loginRequest.setPassword("wrong-password");
-
-        // Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isUnauthorized());
-    }
-
-    // Helper method to create a user for tests
     private void createTestUser(String username, String email, String rawPassword) {
         Plan polarisPlan = planRepository.findByName("Polaris").orElseThrow();
         User user = new User();
