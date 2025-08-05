@@ -9,5 +9,6 @@
     <include file="db/changelog/changesets/002-add-updated_at-to-users.xml"/>
     <include file="db/changelog/changesets/003-create-url-and-click-tables.xml"/>
     <include file="db/changelog/changesets/004-add-index-on-expiration-date.xml"/>
+    <include file="db/changelog/changesets/005-add-click-count-to-urls.xml"/>
 
 </databaseChangeLog>

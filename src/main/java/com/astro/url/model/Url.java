@@ -36,6 +36,9 @@ public class Url {
     @Column(nullable = true)
     private String password;
 
+    @Column(name = "click_count", nullable = false)
+    private long clickCount = 0;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = true)
     private User user;

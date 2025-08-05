@@ -4,6 +4,7 @@ import com.astro.config.AbstractIntegrationTest;
 import com.astro.auth.dto.LoginRequest;
 import com.astro.auth.dto.LoginResponse;
 import com.astro.url.dto.UrlShortenRequest;
+import com.astro.url.model.Url;
 import com.astro.url.repository.UrlRepository;
 import com.astro.user.model.User;
 import com.astro.user.plan.model.Plan;
@@ -20,10 +21,14 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
+
 import static org.hamcrest.Matchers.hasLength;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.hamcrest.Matchers.is;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -129,5 +134,47 @@ class UrlControllerTest extends AbstractIntegrationTest {
         user.setPassword(passwordEncoder.encode(rawPassword));
         user.setPlan(polarisPlan);
         userRepository.save(user);
+    }
+
+    @Test
+    void getUserUrls_shouldReturnPagedListOfUrls_forAuthenticatedUser() throws Exception {
+        // Given a logged-in user with 6 URLs
+        String token = getAuthToken("list-user", "list@test.com", "password123");
+        User user = userRepository.findByIdentifierWithPlan("list-user").orElseThrow();
+        for (int i = 0; i < 6; i++) {
+            createTestUrl("https://example.com/" + i, "slug" + i, user);
+        }
+
+        // When requesting the first page
+        mockMvc.perform(get("/api/url?page=0&size=5")
+                        .header("Authorization", "Bearer " + token))
+                // Then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()", is(5)))
+                .andExpect(jsonPath("$.totalPages", is(2)))
+                .andExpect(jsonPath("$.totalElements", is(6)))
+                .andExpect(jsonPath("$.number", is(0)));
+
+        // When requesting the second page
+        mockMvc.perform(get("/api/url?page=1&size=5")
+                        .header("Authorization", "Bearer " + token))
+                // Then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()", is(1)));
+    }
+
+    @Test
+    void getUserUrls_shouldFailWithUnauthorized_whenNoTokenIsProvided() throws Exception {
+        mockMvc.perform(get("/api/url"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private void createTestUrl(String originalUrl, String slug, User user) {
+        Url url = new Url();
+        url.setOriginalUrl(originalUrl);
+        url.setSlug(slug);
+        url.setUser(user);
+        url.setExpirationDate(LocalDateTime.now().plusDays(10));
+        urlRepository.save(url);
     }
 }

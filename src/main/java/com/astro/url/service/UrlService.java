@@ -7,6 +7,7 @@ import com.astro.url.dto.UrlShortenRequest;
 import com.astro.url.mapper.UrlMapper;
 import com.astro.url.model.Url;
 import com.astro.url.repository.UrlRepository;
+import com.astro.url.dto.UrlResponse;
 import com.astro.user.model.User;
 import com.astro.shared.exceptions.RateLimitExceededException;
 import com.astro.shared.exceptions.UrlExpiredException;
@@ -23,6 +24,10 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import com.astro.user.model.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -117,5 +122,12 @@ public class UrlService {
         clickLoggingService.logClick(url, ipAddress, userAgent);
 
         return url.getOriginalUrl();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<UrlResponse> getUrlsForUser(User user, Pageable pageable, String requestUrl) {
+        Page<Url> urlPage = urlRepository.findByUser(user, pageable);
+        String baseUrl = getBaseUrl(requestUrl);
+        return urlPage.map(url -> urlMapper.toUrlResponse(url, baseUrl));
     }
 }
