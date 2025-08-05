@@ -14,39 +14,35 @@ public class RateLimitingService {
     private final RedisTemplate<String, String> redisTemplate;
 
     private static final int ANONYMOUS_URL_LIMIT = 7;
+    private static final int REDIRECT_LIMIT_PER_MINUTE = 50;
+
     private static final String ANONYMOUS_KEY_PREFIX = "rate_limit:url_creation:ip:";
     private static final String AUTH_KEY_PREFIX = "rate_limit:url_creation:user:";
+    private static final String REDIRECT_KEY_PREFIX = "rate_limit:redirect:ip:";
 
     public boolean isAllowedForAnonymous(String ipAddress) {
         String key = ANONYMOUS_KEY_PREFIX + ipAddress;
-        return isAllowed(key, ANONYMOUS_URL_LIMIT);
+        return isAllowed(key, ANONYMOUS_URL_LIMIT, Duration.ofDays(1));
     }
 
     public boolean isAllowedForUser(User user) {
         String key = AUTH_KEY_PREFIX + user.getId();
         int limit = user.getPlan().getUrlLimitPerDay();
-
-        // A limit of -1 means unlimited
-        if (limit < 0) {
-            return true;
-        }
-
-        return isAllowed(key, limit);
+        if (limit < 0) return true;
+        return isAllowed(key, limit, Duration.ofDays(1));
     }
 
-    private boolean isAllowed(String key, int limit) {
+    public boolean isRedirectAllowed(String ipAddress) {
+        String key = REDIRECT_KEY_PREFIX + ipAddress;
+        return isAllowed(key, REDIRECT_LIMIT_PER_MINUTE, Duration.ofMinutes(1));
+    }
+
+    private boolean isAllowed(String key, int limit, Duration ttl) {
         Long currentCount = redisTemplate.opsForValue().increment(key);
-
-        if (currentCount == null) {
-            // This should ideally not happen in a stable Redis environment
-            return false;
-        }
-
+        if (currentCount == null) return false;
         if (currentCount == 1) {
-            // First request for this key, set expiry to 24 hours (end of day UTC is better, but this is simpler)
-            redisTemplate.expire(key, Duration.ofDays(1));
+            redisTemplate.expire(key, ttl);
         }
-
         return currentCount <= limit;
     }
 }
