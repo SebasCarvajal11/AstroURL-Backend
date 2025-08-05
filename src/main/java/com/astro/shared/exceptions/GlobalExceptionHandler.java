@@ -25,6 +25,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(apiResponse, HttpStatus.FORBIDDEN);
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiResponse> handleRateLimitExceededException(RateLimitExceededException ex) {
+        ApiResponse apiResponse = new ApiResponse(false, ex.getMessage());
+        return new ResponseEntity<>(apiResponse, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
         ApiResponse apiResponse = new ApiResponse(false, ex.getMessage());
