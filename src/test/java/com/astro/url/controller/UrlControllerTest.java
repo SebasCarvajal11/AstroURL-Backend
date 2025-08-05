@@ -24,11 +24,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.hasLength;
-import static org.hamcrest.Matchers.is;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.hamcrest.Matchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -182,6 +179,27 @@ class UrlControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(delete("/api/url/" + nonExistentId)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shortenUrl_shouldFail_whenRateLimitIsExceeded() throws Exception {
+        UrlShortenRequest request = new UrlShortenRequest();
+        request.setOriginalUrl("https://example.com");
+
+        for (int i = 0; i < 7; i++) {
+            mockMvc.perform(post("/api/url")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isCreated());
+        }
+
+        mockMvc.perform(post("/api/url")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.status", is(429)))
+                .andExpect(jsonPath("$.error", is("Too Many Requests")))
+                .andExpect(jsonPath("$.message", is("Rate limit of 7 URLs per day exceeded for your IP address.")));
     }
 
     private String getAuthToken(String username, String email, String rawPassword) throws Exception {
