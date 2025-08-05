@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # MySQL Database Service
+  db:
+    image: mysql:8.0
+    container_name: astrourl-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "${MYSQL_PORT}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - astrourl-net
+
+  # Redis Cache Service
+  cache:
+    image: redis:7.0-alpine
+    container_name: astrourl-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - astrourl-net
+
+# Define the custom network
+networks:
+  astrourl-net:
+    driver: bridge
+
+# Define the persistent volumes
+volumes:
+  mysql_data:
+  redis_data:

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Changeset 1: Create the 'plans' table -->
+    <changeSet id="001-create-plans-table" author="dev.astrourl">
+        <createTable tableName="plans">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="url_limit_per_day" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="api_limit_per_month" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="custom_slug_enabled" type="BOOLEAN">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- Changeset 2: Insert the initial plans (Polaris and Sirio) -->
+    <changeSet id="002-insert-initial-plans" author="dev.astrourl">
+        <insert tableName="plans">
+            <column name="name" value="Polaris"/>
+            <column name="url_limit_per_day" value="15"/>
+            <column name="api_limit_per_month" value="30"/>
+            <column name="custom_slug_enabled" valueBoolean="false"/>
+        </insert>
+        <insert tableName="plans">
+            <column name="name" value="Sirio"/>
+            <column name="url_limit_per_day" value="-1"/> <!-- -1 represents unlimited -->
+            <column name="api_limit_per_month" value="150"/>
+            <column name="custom_slug_enabled" valueBoolean="true"/>
+        </insert>
+    </changeSet>
+
+    <!-- Changeset 3: Create the 'users' table -->
+    <changeSet id="003-create-users-table" author="dev.astrourl">
+        <createTable tableName="users">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="username" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="email" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="password" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="plan_id" type="BIGINT">
+                <constraints nullable="false" foreignKeyName="fk_users_plan" referencedTableName="plans" referencedColumnNames="id"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>
