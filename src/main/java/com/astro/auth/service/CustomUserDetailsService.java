@@ -6,6 +6,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -14,10 +15,9 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
 
     @Override
+    @Transactional(readOnly = true) // readOnly transaction is efficient for find operations.
     public UserDetails loadUserByUsername(String loginIdentifier) throws UsernameNotFoundException {
-        // Allow users to log in with either username or email
-        return userRepository.findByUsername(loginIdentifier)
-                .or(() -> userRepository.findByEmail(loginIdentifier))
+        return userRepository.findByIdentifierWithPlan(loginIdentifier)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with identifier: " + loginIdentifier));
     }
 }
