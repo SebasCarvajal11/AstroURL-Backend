@@ -23,12 +23,14 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasLength;
+import static org.hamcrest.Matchers.is;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.hamcrest.Matchers.is;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -52,8 +54,6 @@ class UrlControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         redisTemplate.getConnectionFactory().getConnection().flushDb();
-
-        // Clean dependent entities first (Url) before the parent (User)
         urlRepository.deleteAll();
         userRepository.deleteAll();
     }
@@ -108,34 +108,6 @@ class UrlControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.message").value("Your daily URL creation limit has been reached."));
     }
 
-    private String getAuthToken(String username, String email, String rawPassword) throws Exception {
-        createTestUser(username, email, rawPassword);
-
-        LoginRequest loginRequest = new LoginRequest();
-        loginRequest.setLoginIdentifier(username);
-        loginRequest.setPassword(rawPassword);
-
-        String response = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-
-        LoginResponse loginResponse = objectMapper.readValue(response, LoginResponse.class);
-        return loginResponse.getAccessToken();
-    }
-
-    private void createTestUser(String username, String email, String rawPassword) {
-        Plan polarisPlan = planRepository.findByName("Polaris").orElseThrow();
-        User user = new User();
-        user.setUsername(username);
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(rawPassword));
-        user.setPlan(polarisPlan);
-        userRepository.save(user);
-    }
-
     @Test
     void getUserUrls_shouldReturnPagedListOfUrls_forAuthenticatedUser() throws Exception {
         // Given a logged-in user with 6 URLs
@@ -169,12 +141,78 @@ class UrlControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    private void createTestUrl(String originalUrl, String slug, User user) {
+    @Test
+    void deleteUrl_shouldSucceed_whenUserOwnsTheUrl() throws Exception {
+        // Given
+        String token = getAuthToken("delete-user", "delete@test.com", "password123");
+        User user = userRepository.findByIdentifierWithPlan("delete-user").orElseThrow();
+        Url url = createTestUrl("https://todelete.com", "deleteme", user);
+
+        // When & Then
+        mockMvc.perform(delete("/api/url/" + url.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        assertThat(urlRepository.findById(url.getId())).isEmpty();
+    }
+
+    @Test
+    void deleteUrl_shouldFailWithForbidden_whenUserDoesNotOwnTheUrl() throws Exception {
+        // Given
+        User owner = createTestUser("owner", "owner@test.com", "password123");
+        Url url = createTestUrl("https://secret.com", "secret", owner);
+
+        String attackerToken = getAuthToken("attacker", "attacker@test.com", "password123");
+
+        // When & Then
+        mockMvc.perform(delete("/api/url/" + url.getId())
+                        .header("Authorization", "Bearer " + attackerToken))
+                .andExpect(status().isForbidden());
+
+        assertThat(urlRepository.findById(url.getId())).isPresent();
+    }
+
+    @Test
+    void deleteUrl_shouldFailWithNotFound_whenUrlDoesNotExist() throws Exception {
+        // Given
+        String token = getAuthToken("any-user", "any@test.com", "password123");
+        long nonExistentId = 999L;
+
+        // When & Then
+        mockMvc.perform(delete("/api/url/" + nonExistentId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    private String getAuthToken(String username, String email, String rawPassword) throws Exception {
+        createTestUser(username, email, rawPassword);
+        LoginRequest loginRequest = new LoginRequest();
+        loginRequest.setLoginIdentifier(username);
+        loginRequest.setPassword(rawPassword);
+        String response = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andReturn().getResponse().getContentAsString();
+        LoginResponse loginResponse = objectMapper.readValue(response, LoginResponse.class);
+        return loginResponse.getAccessToken();
+    }
+
+    private User createTestUser(String username, String email, String rawPassword) {
+        Plan polarisPlan = planRepository.findByName("Polaris").orElseThrow();
+        User user = new User();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setPlan(polarisPlan);
+        return userRepository.save(user);
+    }
+
+    private Url createTestUrl(String originalUrl, String slug, User user) {
         Url url = new Url();
         url.setOriginalUrl(originalUrl);
         url.setSlug(slug);
         url.setUser(user);
         url.setExpirationDate(LocalDateTime.now().plusDays(10));
-        urlRepository.save(url);
+        return urlRepository.save(url);
     }
 }

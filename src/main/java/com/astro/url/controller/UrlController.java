@@ -15,11 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/url")
@@ -34,7 +30,6 @@ public class UrlController {
                                                   Authentication authentication) {
         String requestUrl = httpServletRequest.getRequestURL().toString();
         UrlResponse response;
-
         if (authentication != null && authentication.isAuthenticated() && authentication.getPrincipal() instanceof User) {
             User user = (User) authentication.getPrincipal();
             response = urlService.shortenUrlForAuthenticatedUser(request, user, requestUrl);
@@ -42,7 +37,6 @@ public class UrlController {
             String ipAddress = httpServletRequest.getRemoteAddr();
             response = urlService.shortenUrlForAnonymous(request, ipAddress, requestUrl);
         }
-
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
@@ -52,10 +46,17 @@ public class UrlController {
             @PageableDefault(size = 5, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             HttpServletRequest httpServletRequest,
             Authentication authentication) {
-
         User user = (User) authentication.getPrincipal();
         String requestUrl = httpServletRequest.getRequestURL().toString();
         Page<UrlResponse> urls = urlService.getUrlsForUser(user, pageable, requestUrl);
         return ResponseEntity.ok(urls);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> deleteUrl(@PathVariable Long id, Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        urlService.deleteUrlById(id, user);
+        return ResponseEntity.noContent().build();
     }
 }
