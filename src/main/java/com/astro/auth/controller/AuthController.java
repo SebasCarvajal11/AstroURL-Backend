@@ -1,11 +1,16 @@
 package com.astro.auth.controller;
 
+import com.astro.auth.dto.ForgotPasswordRequest;
 import com.astro.auth.dto.LoginRequest;
 import com.astro.auth.dto.LoginResponse;
 import com.astro.auth.dto.RefreshTokenRequest;
 import com.astro.auth.dto.RegisterRequest;
 import com.astro.auth.service.AuthService;
 import com.astro.shared.dto.ApiResponse;
+import com.astro.shared.exceptions.RateLimitExceededException;
+import com.astro.shared.utils.HttpServletRequestUtils;
+import com.astro.url.service.RateLimitingService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final RateLimitingService rateLimitingService;
+    private final HttpServletRequestUtils requestUtils;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
@@ -38,5 +45,18 @@ public class AuthController {
     public ResponseEntity<LoginResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
         LoginResponse response = authService.refreshAccessToken(request.getRefreshToken());
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest httpRequest) {
+        String ipAddress = requestUtils.getClientIpAddress(httpRequest);
+        if (!rateLimitingService.isForgotPasswordAllowed(ipAddress)) {
+            throw new RateLimitExceededException("You have made too many password reset requests. Please try again later.");
+        }
+
+        authService.forgotPassword(request);
+
+        String message = "If an account with that email address exists, a password reset link has been sent.";
+        return ResponseEntity.ok(new ApiResponse(true, message));
     }
 }

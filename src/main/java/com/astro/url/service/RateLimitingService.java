@@ -15,10 +15,12 @@ public class RateLimitingService {
 
     private static final int ANONYMOUS_URL_LIMIT = 7;
     private static final int REDIRECT_LIMIT_PER_MINUTE = 50;
+    private static final int FORGOT_PASSWORD_LIMIT_PER_HOUR = 5;
 
     private static final String ANONYMOUS_KEY_PREFIX = "rate_limit:url_creation:ip:";
     private static final String AUTH_KEY_PREFIX = "rate_limit:url_creation:user:";
     private static final String REDIRECT_KEY_PREFIX = "rate_limit:redirect:ip:";
+    private static final String FORGOT_PASSWORD_KEY_PREFIX = "rate_limit:forgot_password:ip:";
 
     public boolean isAllowedForAnonymous(String ipAddress) {
         String key = ANONYMOUS_KEY_PREFIX + ipAddress;
@@ -35,6 +37,11 @@ public class RateLimitingService {
     public boolean isRedirectAllowed(String ipAddress) {
         String key = REDIRECT_KEY_PREFIX + ipAddress;
         return isAllowed(key, REDIRECT_LIMIT_PER_MINUTE, Duration.ofMinutes(1));
+    }
+
+    public boolean isForgotPasswordAllowed(String ipAddress) {
+        String key = FORGOT_PASSWORD_KEY_PREFIX + ipAddress;
+        return isAllowed(key, FORGOT_PASSWORD_LIMIT_PER_HOUR, Duration.ofHours(1));
     }
 
     private boolean isAllowed(String key, int limit, Duration ttl) {

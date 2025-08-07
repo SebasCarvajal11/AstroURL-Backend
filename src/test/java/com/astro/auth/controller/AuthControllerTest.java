@@ -1,9 +1,11 @@
 package com.astro.auth.controller;
 
 import com.astro.config.AbstractIntegrationTest;
+import com.astro.auth.dto.ForgotPasswordRequest;
 import com.astro.auth.dto.LoginRequest;
 import com.astro.auth.dto.LoginResponse;
 import com.astro.auth.dto.RefreshTokenRequest;
+import com.astro.shared.service.EmailService;
 import com.astro.user.model.User;
 import com.astro.user.plan.model.Plan;
 import com.astro.user.repository.UserRepository;
@@ -11,10 +13,12 @@ import com.astro.user.plan.repository.PlanRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,7 +30,8 @@ import java.time.Instant;
 import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.is;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,6 +57,9 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @MockBean
     private Clock clock;
 
+    @SpyBean
+    private EmailService emailService;
+
     private static final Instant MOCK_TIME_NOW = Instant.parse("2025-08-10T10:00:00Z");
     private static final Instant MOCK_TIME_LATER = Instant.parse("2025-08-10T10:00:10Z");
 
@@ -59,20 +67,17 @@ class AuthControllerTest extends AbstractIntegrationTest {
     void setUp() {
         userRepository.deleteAll();
         redisTemplate.getConnectionFactory().getConnection().flushDb();
-        // Set a default time for the clock
         when(clock.instant()).thenReturn(MOCK_TIME_NOW);
         when(clock.getZone()).thenReturn(ZoneId.systemDefault());
     }
 
     @Test
     void refreshToken_shouldSucceed_whenTokenIsValid() throws Exception {
-        // Given: a logged-in user with a valid refresh token generated at MOCK_TIME_NOW
         when(clock.instant()).thenReturn(MOCK_TIME_NOW);
         createTestUser("refresh-user", "refresh@test.com", "password123");
         LoginRequest loginRequest = new LoginRequest();
         loginRequest.setLoginIdentifier("refresh-user");
         loginRequest.setPassword("password123");
-
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
@@ -81,11 +86,9 @@ class AuthControllerTest extends AbstractIntegrationTest {
         String originalRefreshToken = loginResponse.getRefreshToken();
         String originalAccessToken = loginResponse.getAccessToken();
 
-        // When: requesting a new access token at a later time
-        when(clock.instant()).thenReturn(MOCK_TIME_LATER); // Advance the clock
+        when(clock.instant()).thenReturn(MOCK_TIME_LATER);
         RefreshTokenRequest refreshRequest = new RefreshTokenRequest();
         refreshRequest.setRefreshToken(originalRefreshToken);
-
         MvcResult refreshResult = mockMvc.perform(post("/api/auth/refresh-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest)))
@@ -94,7 +97,6 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.refreshToken", notNullValue()))
                 .andReturn();
 
-        // Then: the new tokens should be different from the old ones because the timestamp has changed
         LoginResponse refreshResponse = objectMapper.readValue(refreshResult.getResponse().getContentAsString(), LoginResponse.class);
         assertThat(refreshResponse.getAccessToken()).isNotEqualTo(originalAccessToken);
         assertThat(refreshResponse.getRefreshToken()).isNotEqualTo(originalRefreshToken);
@@ -102,26 +104,59 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     @Test
     void refreshToken_shouldFail_whenTokenIsInvalid() throws Exception {
-        // When: using a bogus refresh token
         RefreshTokenRequest refreshRequest = new RefreshTokenRequest();
         refreshRequest.setRefreshToken("this.is.a.bogus.token");
 
-        // Then
         mockMvc.perform(post("/api/auth/refresh-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.success").value(false));
+                .andExpect(jsonPath("$.status", is(403)))
+                .andExpect(jsonPath("$.error", is("Forbidden")));
     }
 
+    @Test
+    void forgotPassword_shouldReturnOkAndSendEmail_whenUserExists() throws Exception {
+        createTestUser("forgot-user", "forgot@test.com", "password123");
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("forgot@test.com");
 
-    private void createTestUser(String username, String email, String rawPassword) {
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService, timeout(1000).times(1)).sendPasswordResetEmail(
+                eq("forgot@test.com"), tokenCaptor.capture(), anyString()
+        );
+
+        String token = tokenCaptor.getValue();
+        assertThat(redisTemplate.hasKey("user:resetToken:" + token)).isTrue();
+    }
+
+    @Test
+    void forgotPassword_shouldReturnOkAndNotSendEmail_whenUserDoesNotExist() throws Exception {
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("nonexistent@test.com");
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString(), anyString());
+    }
+
+    private User createTestUser(String username, String email, String rawPassword) {
         Plan polarisPlan = planRepository.findByName("Polaris").orElseThrow();
         User user = new User();
         user.setUsername(username);
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(rawPassword));
         user.setPlan(polarisPlan);
-        userRepository.save(user);
+        return userRepository.save(user);
     }
 }
