@@ -2,6 +2,8 @@ package com.astro.auth.service;
 
 import com.astro.auth.dto.*;
 import com.astro.auth.security.JwtTokenProvider;
+import com.astro.auth.service.validation.AuthValidatorService;
+import com.astro.auth.token.TokenRevocationService;
 import com.astro.shared.exceptions.InvalidTokenException;
 import com.astro.shared.exceptions.TokenRefreshException;
 import com.astro.shared.exceptions.UserAlreadyExistsException;
@@ -21,6 +23,8 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +41,10 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final RedisTemplate<String, String> redisTemplate;
     private final EmailService emailService;
+    private final AuthValidatorService authValidator;
+    private final TokenRevocationService tokenRevocationService;
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     @Value("${astrourl.frontend.reset-password-url}")
     private String resetPasswordUrlBase;
@@ -132,5 +140,16 @@ public class AuthService {
         String redisKey = "user:refreshToken:" + userPrincipal.getId();
         redisTemplate.opsForValue().set(redisKey, refreshToken, 7, TimeUnit.DAYS);
         return new LoginResponse(accessToken, refreshToken);
+    }
+
+    public void logoutAll(User currentUser, String providedPassword) {
+        if (!authValidator.isPasswordCorrect(currentUser, providedPassword)) {
+            throw new IllegalArgumentException("Incorrect password provided.");
+        }
+
+        tokenRevocationService.revokeRefreshToken(currentUser);
+        tokenRevocationService.blacklistUserTokens(currentUser);
+
+        logger.info("User {} successfully logged out from all devices.", currentUser.getUsername());
     }
 }

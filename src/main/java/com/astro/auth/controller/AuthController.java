@@ -16,10 +16,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.astro.auth.dto.*;
+import com.astro.user.model.User;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -63,5 +68,13 @@ public class AuthController {
     public ResponseEntity<ApiResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
         return ResponseEntity.ok(new ApiResponse(true, "Your password has been reset successfully."));
+    }
+
+    @PostMapping("/logout-all")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> logoutAll(Authentication authentication, @Valid @RequestBody PasswordConfirmationRequest request) {
+        User currentUser = (User) authentication.getPrincipal();
+        authService.logoutAll(currentUser, request.getCurrentPassword());
+        return ResponseEntity.noContent().build();
     }
 }

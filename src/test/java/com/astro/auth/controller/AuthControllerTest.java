@@ -36,6 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.notNullValue;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 class AuthControllerTest extends AbstractIntegrationTest {
@@ -199,6 +201,60 @@ class AuthControllerTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", is("Passwords do not match.")));
+    }
+
+    @Test
+    void logoutAll_shouldSucceedAndRevokeTokens_whenPasswordIsCorrect() throws Exception {
+        String token = getAuthToken("logout-user", "logout@test.com", "password123");
+        User user = userRepository.findByIdentifierWithPlan("logout-user").orElseThrow();
+        String refreshTokenKey = "user:refreshToken:" + user.getId();
+
+        assertThat(redisTemplate.hasKey(refreshTokenKey)).isTrue();
+
+        PasswordConfirmationRequest request = new PasswordConfirmationRequest();
+        request.setCurrentPassword("password123");
+
+        mockMvc.perform(post("/api/auth/logout-all")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNoContent());
+
+        assertThat(redisTemplate.hasKey(refreshTokenKey)).isFalse();
+        assertThat(redisTemplate.hasKey("user:tokenBlacklist:" + user.getId())).isTrue();
+
+        mockMvc.perform(get("/api/profile")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logoutAll_shouldFail_whenPasswordIsIncorrect() throws Exception {
+        String token = getAuthToken("logout-fail-user", "logoutfail@test.com", "password123");
+        PasswordConfirmationRequest request = new PasswordConfirmationRequest();
+        request.setCurrentPassword("wrongPassword");
+
+        mockMvc.perform(post("/api/auth/logout-all")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    private String getAuthToken(String username, String email, String rawPassword) throws Exception {
+        createTestUser(username, email, rawPassword);
+        LoginRequest loginRequest = new LoginRequest();
+        loginRequest.setLoginIdentifier(username);
+        loginRequest.setPassword(rawPassword);
+
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        LoginResponse loginResponse = objectMapper.readValue(result.getResponse().getContentAsString(), LoginResponse.class);
+        return loginResponse.getAccessToken();
     }
 
     private User createTestUser(String username, String email, String rawPassword) {
