@@ -1,30 +1,23 @@
 package com.astro.auth.controller;
 
-import com.astro.auth.dto.ForgotPasswordRequest;
-import com.astro.auth.dto.LoginRequest;
-import com.astro.auth.dto.LoginResponse;
-import com.astro.auth.dto.RefreshTokenRequest;
-import com.astro.auth.dto.RegisterRequest;
-import com.astro.auth.dto.ResetPasswordRequest;
+import com.astro.auth.dto.*;
 import com.astro.auth.service.AuthService;
 import com.astro.shared.dto.ApiResponse;
 import com.astro.shared.exceptions.RateLimitExceededException;
 import com.astro.shared.utils.HttpServletRequestUtils;
 import com.astro.url.service.RateLimitingService;
+import com.astro.user.model.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.astro.auth.dto.*;
-import com.astro.user.model.User;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
