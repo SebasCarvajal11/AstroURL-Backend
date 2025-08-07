@@ -5,6 +5,7 @@ import com.astro.auth.dto.LoginRequest;
 import com.astro.auth.dto.LoginResponse;
 import com.astro.auth.dto.RefreshTokenRequest;
 import com.astro.auth.dto.RegisterRequest;
+import com.astro.auth.dto.ResetPasswordRequest;
 import com.astro.auth.service.AuthService;
 import com.astro.shared.dto.ApiResponse;
 import com.astro.shared.exceptions.RateLimitExceededException;
@@ -53,10 +54,14 @@ public class AuthController {
         if (!rateLimitingService.isForgotPasswordAllowed(ipAddress)) {
             throw new RateLimitExceededException("You have made too many password reset requests. Please try again later.");
         }
-
         authService.forgotPassword(request);
-
         String message = "If an account with that email address exists, a password reset link has been sent.";
         return ResponseEntity.ok(new ApiResponse(true, message));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(new ApiResponse(true, "Your password has been reset successfully."));
     }
 }

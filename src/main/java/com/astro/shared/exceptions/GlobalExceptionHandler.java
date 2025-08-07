@@ -22,6 +22,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(InvalidTokenException.class)
+    protected ResponseEntity<Object> handleInvalidToken(InvalidTokenException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(UrlNotFoundException.class)
     protected ResponseEntity<Object> handleUrlNotFound(UrlNotFoundException ex) {
         ErrorResponse errorResponse = new ErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage());
@@ -46,11 +52,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
     }
 
-    @ExceptionHandler({RateLimitExceededException.class, TokenRefreshException.class})
-    protected ResponseEntity<Object> handleClientSideExceptions(RuntimeException ex) {
-        HttpStatus status = ex instanceof RateLimitExceededException ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.FORBIDDEN;
-        ErrorResponse errorResponse = new ErrorResponse(status, ex.getMessage());
-        return new ResponseEntity<>(errorResponse, status);
+    @ExceptionHandler(RateLimitExceededException.class)
+    protected ResponseEntity<Object> handleRateLimitExceeded(RateLimitExceededException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    @ExceptionHandler(TokenRefreshException.class)
+    protected ResponseEntity<Object> handleTokenRefresh(TokenRefreshException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Object> handleIllegalArgumentException(IllegalArgumentException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)

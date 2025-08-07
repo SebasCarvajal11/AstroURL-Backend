@@ -1,10 +1,7 @@
 package com.astro.auth.controller;
 
 import com.astro.config.AbstractIntegrationTest;
-import com.astro.auth.dto.ForgotPasswordRequest;
-import com.astro.auth.dto.LoginRequest;
-import com.astro.auth.dto.LoginResponse;
-import com.astro.auth.dto.RefreshTokenRequest;
+import com.astro.auth.dto.*;
 import com.astro.shared.service.EmailService;
 import com.astro.user.model.User;
 import com.astro.user.plan.model.Plan;
@@ -28,14 +25,16 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.is;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -151,6 +150,55 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true));
 
         verify(emailService, never()).sendPasswordResetEmail(any(User.class), anyString(), anyString());
+    }
+
+    @Test
+    void resetPassword_shouldSucceed_whenTokenIsValid() throws Exception {
+        User user = createTestUser("reset-user", "reset@test.com", "oldPassword123");
+        String token = UUID.randomUUID().toString();
+        redisTemplate.opsForValue().set("user:resetToken:" + token, user.getId().toString(), 15, TimeUnit.MINUTES);
+
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setToken(token);
+        request.setNewPassword("newStrongPassword");
+        request.setConfirmPassword("newStrongPassword");
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        User updatedUser = userRepository.findById(user.getId()).orElseThrow();
+        assertThat(passwordEncoder.matches("newStrongPassword", updatedUser.getPassword())).isTrue();
+        assertThat(redisTemplate.hasKey("user:resetToken:" + token)).isFalse();
+    }
+
+    @Test
+    void resetPassword_shouldFail_whenTokenIsInvalid() throws Exception {
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setToken("invalid-token");
+        request.setNewPassword("newStrongPassword");
+        request.setConfirmPassword("newStrongPassword");
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void resetPassword_shouldFail_whenPasswordsDoNotMatch() throws Exception {
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setToken("any-token");
+        request.setNewPassword("newStrongPassword");
+        request.setConfirmPassword("non-matching-password");
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("Passwords do not match.")));
     }
 
     private User createTestUser(String username, String email, String rawPassword) {

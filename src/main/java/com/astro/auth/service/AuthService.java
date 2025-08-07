@@ -1,10 +1,8 @@
 package com.astro.auth.service;
 
-import com.astro.auth.dto.ForgotPasswordRequest;
-import com.astro.auth.dto.LoginRequest;
-import com.astro.auth.dto.LoginResponse;
-import com.astro.auth.dto.RegisterRequest;
+import com.astro.auth.dto.*;
 import com.astro.auth.security.JwtTokenProvider;
+import com.astro.shared.exceptions.InvalidTokenException;
 import com.astro.shared.exceptions.TokenRefreshException;
 import com.astro.shared.exceptions.UserAlreadyExistsException;
 import com.astro.shared.service.EmailService;
@@ -80,16 +78,35 @@ public class AuthService {
     @Transactional(readOnly = true)
     public void forgotPassword(ForgotPasswordRequest request) {
         Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
-
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             String token = UUID.randomUUID().toString();
             String redisKey = RESET_TOKEN_PREFIX + token;
-
             redisTemplate.opsForValue().set(redisKey, user.getId().toString(), 15, TimeUnit.MINUTES);
-
             emailService.sendPasswordResetEmail(user, token, resetPasswordUrlBase);
         }
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("Passwords do not match.");
+        }
+
+        String redisKey = RESET_TOKEN_PREFIX + request.getToken();
+        String userId = redisTemplate.opsForValue().get(redisKey);
+
+        if (userId == null) {
+            throw new InvalidTokenException("Invalid or expired password reset token.");
+        }
+
+        User user = userRepository.findById(Long.parseLong(userId))
+                .orElseThrow(() -> new InvalidTokenException("User not found for the given reset token."));
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        redisTemplate.delete(redisKey);
     }
 
     public LoginResponse refreshAccessToken(String refreshToken) {
