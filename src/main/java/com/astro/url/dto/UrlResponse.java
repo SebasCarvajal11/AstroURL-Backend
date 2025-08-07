@@ -17,4 +17,5 @@ public class UrlResponse {
     private String shortUrl;
     private LocalDateTime expirationDate;
     private LocalDateTime createdAt;
+    private long clickCount;
 }

@@ -24,7 +24,7 @@ public class Url {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 10)
+    @Column(nullable = false, unique = true, length = 15)
     private String slug;
 
     @Column(name = "original_url", nullable = false, length = 2048)

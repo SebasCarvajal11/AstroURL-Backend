@@ -14,6 +14,7 @@ public class UrlMapper {
                 .shortUrl(baseUrl + "/r/" + url.getSlug())
                 .expirationDate(url.getExpirationDate())
                 .createdAt(url.getCreatedAt())
+                .clickCount(url.getClickCount())
                 .build();
     }
 }

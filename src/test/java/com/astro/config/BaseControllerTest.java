@@ -1,0 +1,97 @@
+package com.astro.config;
+
+import com.astro.auth.dto.LoginRequest;
+import com.astro.auth.dto.LoginResponse;
+import com.astro.stats.repository.ClickRepository;
+import com.astro.url.repository.UrlRepository;
+import com.astro.user.model.User;
+import com.astro.user.plan.model.Plan;
+import com.astro.user.plan.repository.PlanRepository;
+import com.astro.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+public abstract class BaseControllerTest extends AbstractIntegrationTest {
+
+    @Autowired
+    protected MockMvc mockMvc;
+    @Autowired
+    protected ObjectMapper objectMapper;
+    @Autowired
+    protected UserRepository userRepository;
+    @Autowired
+    protected PlanRepository planRepository;
+    @Autowired
+    protected PasswordEncoder passwordEncoder;
+    @Autowired
+    protected RedisTemplate<String, String> redisTemplate;
+    @Autowired
+    protected UrlRepository urlRepository;
+    @Autowired
+    protected ClickRepository clickRepository;
+
+    @MockBean
+    protected Clock clock;
+
+    protected static final Instant MOCK_TIME_NOW = Instant.parse("2025-08-10T10:00:00Z");
+
+    @BeforeEach
+    void baseSetUp() {
+        redisTemplate.getConnectionFactory().getConnection().flushDb();
+
+        clickRepository.deleteAll();
+        urlRepository.deleteAll();
+        userRepository.deleteAll();
+
+        when(clock.instant()).thenReturn(MOCK_TIME_NOW);
+        when(clock.getZone()).thenReturn(ZoneId.systemDefault());
+    }
+
+    protected User createTestUser(String username, String email, String rawPassword) {
+        Plan polarisPlan = planRepository.findByName("Polaris").orElseThrow();
+        User user = new User();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setPlan(polarisPlan);
+        return userRepository.save(user);
+    }
+
+    protected String getAuthTokenJson(String username, String email, String rawPassword) throws Exception {
+        createTestUser(username, email, rawPassword);
+        LoginRequest loginRequest = new LoginRequest();
+        loginRequest.setLoginIdentifier(username);
+        loginRequest.setPassword(rawPassword);
+
+        return mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    protected String getAccessToken(String username, String email, String rawPassword) throws Exception {
+        String jsonResponse = getAuthTokenJson(username, email, rawPassword);
+        LoginResponse loginResponse = objectMapper.readValue(jsonResponse, LoginResponse.class);
+        return loginResponse.getAccessToken();
+    }
+}
