@@ -88,7 +88,7 @@ public class AuthService {
 
             redisTemplate.opsForValue().set(redisKey, user.getId().toString(), 15, TimeUnit.MINUTES);
 
-            emailService.sendPasswordResetEmail(user.getEmail(), token, resetPasswordUrlBase);
+            emailService.sendPasswordResetEmail(user, token, resetPasswordUrlBase);
         }
     }
 
@@ -97,7 +97,7 @@ public class AuthService {
             throw new TokenRefreshException(refreshToken, "Refresh token is invalid or expired!");
         }
         String username = tokenProvider.getUsernameFromJWT(refreshToken);
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByIdentifierWithPlan(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User associated with token not found."));
         String redisKey = "user:refreshToken:" + user.getId();
         String storedToken = redisTemplate.opsForValue().get(redisKey);

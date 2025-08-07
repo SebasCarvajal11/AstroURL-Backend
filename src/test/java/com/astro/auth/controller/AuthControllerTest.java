@@ -30,12 +30,12 @@ import java.time.Instant;
 import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.is;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -127,11 +127,14 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+
         verify(emailService, timeout(1000).times(1)).sendPasswordResetEmail(
-                eq("forgot@test.com"), tokenCaptor.capture(), anyString()
+                userCaptor.capture(), tokenCaptor.capture(), anyString()
         );
 
+        assertThat(userCaptor.getValue().getEmail()).isEqualTo("forgot@test.com");
         String token = tokenCaptor.getValue();
         assertThat(redisTemplate.hasKey("user:resetToken:" + token)).isTrue();
     }
@@ -147,7 +150,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
-        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString(), anyString());
+        verify(emailService, never()).sendPasswordResetEmail(any(User.class), anyString(), anyString());
     }
 
     private User createTestUser(String username, String email, String rawPassword) {
