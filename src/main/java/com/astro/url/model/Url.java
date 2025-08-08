@@ -39,6 +39,9 @@ public class Url {
     @Column(name = "click_count", nullable = false)
     private long clickCount = 0;
 
+    @Column(name = "last_accessed_at")
+    private LocalDateTime lastAccessedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = true)
     private User user;

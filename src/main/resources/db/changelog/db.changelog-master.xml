@@ -12,5 +12,6 @@
     <include file="db/changelog/changesets/005-add-click-count-to-urls.xml"/>
     <include file="db/changelog/changesets/006-alter-url-slug-length.xml"/>
     <include file="db/changelog/changesets/007-add-expiration-fields-to-plans.xml"/>
+    <include file="db/changelog/changesets/008-add-last-accessed-to-urls.xml"/>
 
 </databaseChangeLog>

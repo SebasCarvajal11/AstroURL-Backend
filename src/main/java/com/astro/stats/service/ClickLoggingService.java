@@ -11,12 +11,16 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class ClickLoggingService {
 
     private final ClickRepository clickRepository;
     private final UrlRepository urlRepository;
+    private final Clock clock;
     private static final Logger logger = LoggerFactory.getLogger(ClickLoggingService.class);
 
     @Async("taskExecutor")
@@ -29,7 +33,7 @@ public class ClickLoggingService {
             click.setUserAgent(userAgent);
             clickRepository.save(click);
 
-            urlRepository.incrementClickCount(url.getId());
+            urlRepository.incrementClickCountAndSetLastAccessed(url.getId(), LocalDateTime.now(clock));
         } catch (Exception e) {
             logger.error("Failed to log click asynchronously for slug: {}", url.getSlug(), e);
         }
