@@ -5,7 +5,6 @@ import com.astro.user.model.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -20,8 +19,4 @@ public interface UrlRepository extends JpaRepository<Url, Long> {
     Page<Url> findByExpirationDateBefore(LocalDateTime dateTime, Pageable pageable);
     Page<Url> findByUser(User user, Pageable pageable);
     List<Url> findByUserAndExpirationDateAfter(User user, LocalDateTime dateTime);
-
-    @Modifying
-    @Query("UPDATE Url u SET u.clickCount = u.clickCount + 1, u.lastAccessedAt = :now WHERE u.id = :urlId")
-    void incrementClickCountAndSetLastAccessed(@Param("urlId") Long urlId, @Param("now") LocalDateTime now);
 }

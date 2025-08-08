@@ -17,9 +17,10 @@ public abstract class AbstractIntegrationTest {
 
     @DynamicPropertySource
     static void dynamicProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", mySQLContainer::getJdbcUrl);
+        String jdbcUrl = mySQLContainer.getJdbcUrl() + "?serverTimezone=UTC";
+        registry.add("spring.datasource.url", () -> jdbcUrl);
         registry.add("spring.datasource.username", mySQLContainer::getUsername);
         registry.add("spring.datasource.password", mySQLContainer::getPassword);
-        registry.add("spring.liquibase.enabled", () -> "true"); // Ensure Liquibase runs on the test container
+        registry.add("spring.liquibase.enabled", () -> "true");
     }
 }
