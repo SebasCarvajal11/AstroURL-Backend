@@ -3,7 +3,9 @@ package com.astro.url.controller;
 import com.astro.url.creation.UrlCreationService;
 import com.astro.url.dto.UrlResponse;
 import com.astro.url.dto.UrlShortenRequest;
+import com.astro.url.dto.UrlUpdateRequest;
 import com.astro.url.retrieval.UrlRetrievalService;
+import com.astro.url.update.UrlUpdateService;
 import com.astro.url.validation.UrlValidationService;
 import com.astro.user.model.User;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +31,7 @@ public class UrlController {
     private final UrlCreationService urlCreationService;
     private final UrlRetrievalService urlRetrievalService;
     private final UrlValidationService urlValidationService;
+    private final UrlUpdateService urlUpdateService;
 
     @PostMapping
     public ResponseEntity<UrlResponse> shortenUrl(@Valid @RequestBody UrlShortenRequest request,
@@ -55,8 +58,20 @@ public class UrlController {
         return ResponseEntity.ok(urls);
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated() and hasAuthority('PLAN_SIRIO')")
+    public ResponseEntity<UrlResponse> updateUrl(@PathVariable Long id,
+                                                 @Valid @RequestBody UrlUpdateRequest request,
+                                                 HttpServletRequest httpServletRequest,
+                                                 Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        String requestUrl = httpServletRequest.getRequestURL().toString();
+        UrlResponse updatedUrl = urlUpdateService.updateUrl(id, request, user, requestUrl);
+        return ResponseEntity.ok(updatedUrl);
+    }
+
     @GetMapping("/validate-slug/{slug}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("isAuthenticated() and hasAuthority('PLAN_SIRIO')")
     public ResponseEntity<Map<String, Boolean>> isSlugAvailable(@PathVariable String slug) {
         boolean isAvailable = urlValidationService.isSlugAvailable(slug);
         return ResponseEntity.ok(Map.of("available", isAvailable));

@@ -2,7 +2,6 @@ package com.astro.url.controller;
 
 import com.astro.config.BaseControllerTest;
 import com.astro.url.dto.UrlShortenRequest;
-import com.astro.user.model.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -15,7 +14,7 @@ public class AuthenticatedUrlCreationTest extends BaseControllerTest {
 
     @Test
     void shortenUrl_shouldSucceed_forAuthenticatedUser() throws Exception {
-        String token = getAccessToken("polaris-user", "polaris@test.com", "password123");
+        String token = getAccessToken("polaris-user", "polaris@test.com", "password123", "Polaris");
 
         UrlShortenRequest request = new UrlShortenRequest();
         request.setOriginalUrl("https://github.com");
@@ -30,7 +29,7 @@ public class AuthenticatedUrlCreationTest extends BaseControllerTest {
 
     @Test
     void shortenUrl_shouldFail_forAuthenticatedUser_whenRateLimitIsExceeded() throws Exception {
-        String token = getAccessToken("rate-limit-user", "rate@test.com", "password123");
+        String token = getAccessToken("rate-limit-user", "rate@test.com", "password123", "Polaris");
         UrlShortenRequest request = new UrlShortenRequest();
         request.setOriginalUrl("https://example.com");
 

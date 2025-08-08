@@ -13,7 +13,10 @@ public class UrlValidator implements ConstraintValidator<ValidUrl, String> {
 
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
-        if (value == null || value.isBlank()) {
+        if (value == null) {
+            return true;
+        }
+        if (value.isBlank()) {
             return false;
         }
         try {

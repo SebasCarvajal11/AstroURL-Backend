@@ -19,6 +19,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -66,13 +67,14 @@ public abstract class BaseControllerTest extends AbstractIntegrationTest {
         when(clock.getZone()).thenReturn(ZoneId.systemDefault());
     }
 
-    protected User createTestUser(String username, String email, String rawPassword) {
-        Plan polarisPlan = planRepository.findByName("Polaris").orElseThrow();
+    protected User createTestUser(String username, String email, String rawPassword, String planName) {
+        Plan plan = planRepository.findByName(planName)
+                .orElseThrow(() -> new IllegalStateException("Plan not found: " + planName));
         User user = new User();
         user.setUsername(username);
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(rawPassword));
-        user.setPlan(polarisPlan);
+        user.setPlan(plan);
         return userRepository.save(user);
     }
 
@@ -85,22 +87,22 @@ public abstract class BaseControllerTest extends AbstractIntegrationTest {
         return urlRepository.save(url);
     }
 
-    protected LoginResponse getLoginResponse(String username, String email, String rawPassword) throws Exception {
-        createTestUser(username, email, rawPassword);
+    protected LoginResponse getLoginResponse(String username, String password) throws Exception {
         LoginRequest loginRequest = new LoginRequest();
         loginRequest.setLoginIdentifier(username);
-        loginRequest.setPassword(rawPassword);
+        loginRequest.setPassword(password);
 
-        String jsonResponse = mockMvc.perform(post("/api/auth/login")
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+                .andReturn();
 
-        return objectMapper.readValue(jsonResponse, LoginResponse.class);
+        return objectMapper.readValue(result.getResponse().getContentAsString(), LoginResponse.class);
     }
 
-    protected String getAccessToken(String username, String email, String rawPassword) throws Exception {
-        return getLoginResponse(username, email, rawPassword).getAccessToken();
+    protected String getAccessToken(String username, String email, String rawPassword, String planName) throws Exception {
+        createTestUser(username, email, rawPassword, planName);
+        return getLoginResponse(username, rawPassword).getAccessToken();
     }
 }

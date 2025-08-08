@@ -24,7 +24,7 @@ public class RegistrationControllerTest extends BaseControllerTest {
         request.setUsername("new-user");
         request.setEmail("newuser@astrourl.com");
         request.setPassword("password123");
-        request.setConfirmPassword("password123");
+        request.setConfirmPassword("password122");
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -38,13 +38,13 @@ public class RegistrationControllerTest extends BaseControllerTest {
 
     @Test
     void registerUser_shouldFail_whenUsernameIsTaken() throws Exception {
-        createTestUser("existing-user", "user1@astrourl.com", "password123");
+        createTestUser("existing-user", "user1@astrourl.com", "password123", "Polaris");
 
         RegisterRequest request = new RegisterRequest();
         request.setUsername("existing-user");
         request.setEmail("user2@astrourl.com");
         request.setPassword("password123");
-        request.setConfirmPassword("password123");
+        request.setConfirmPassword("password122");
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

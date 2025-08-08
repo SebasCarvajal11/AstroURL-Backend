@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Entity
 @Table(name = "users")
@@ -45,13 +46,11 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    // --- UserDetails Implementation ---
-
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // For now, all users have a simple default role.
-        // This can be expanded later to support multiple roles.
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        SimpleGrantedAuthority userRole = new SimpleGrantedAuthority("ROLE_USER");
+        SimpleGrantedAuthority planAuthority = new SimpleGrantedAuthority("PLAN_" + this.plan.getName().toUpperCase());
+        return List.of(userRole, planAuthority);
     }
 
     @Override

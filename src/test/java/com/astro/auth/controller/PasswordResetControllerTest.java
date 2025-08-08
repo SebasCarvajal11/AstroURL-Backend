@@ -6,8 +6,8 @@ import com.astro.config.BaseControllerTest;
 import com.astro.shared.service.EmailService;
 import com.astro.user.model.User;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.http.MediaType;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -27,12 +27,12 @@ public class PasswordResetControllerTest extends BaseControllerTest {
 
     @Test
     void forgotPassword_shouldSendEmail_whenUserExists() throws Exception {
-        createTestUser("forgot-user", "forgot@test.com", "password123");
+        createTestUser("forgot-user", "forgot@test.com", "password123", "Polaris");
         ForgotPasswordRequest request = new ForgotPasswordRequest();
         request.setEmail("forgot@test.com");
 
         mockMvc.perform(post("/api/auth/forgot-password")
-                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
@@ -41,7 +41,7 @@ public class PasswordResetControllerTest extends BaseControllerTest {
 
     @Test
     void resetPassword_shouldSucceed_whenTokenIsValid() throws Exception {
-        User user = createTestUser("reset-user", "reset@test.com", "oldPassword");
+        User user = createTestUser("reset-user", "reset@test.com", "oldPassword", "Polaris");
         String token = UUID.randomUUID().toString();
         redisTemplate.opsForValue().set("user:resetToken:" + token, user.getId().toString(), 15, TimeUnit.MINUTES);
 
@@ -51,7 +51,7 @@ public class PasswordResetControllerTest extends BaseControllerTest {
         request.setConfirmPassword("newPassword");
 
         mockMvc.perform(post("/api/auth/reset-password")
-                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 

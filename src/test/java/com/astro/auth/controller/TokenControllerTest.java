@@ -23,7 +23,8 @@ public class TokenControllerTest extends BaseControllerTest {
 
     @Test
     void refreshToken_shouldSucceed_whenTokenIsValid() throws Exception {
-        LoginResponse loginResponse = getLoginResponse("refresh-user", "refresh@test.com", "password123");
+        createTestUser("refresh-user", "refresh@test.com", "password123", "Polaris");
+        LoginResponse loginResponse = getLoginResponse("refresh-user", "password123");
 
         when(clock.instant()).thenReturn(MOCK_TIME_LATER);
         RefreshTokenRequest refreshRequest = new RefreshTokenRequest();
@@ -52,7 +53,7 @@ public class TokenControllerTest extends BaseControllerTest {
 
     @Test
     void logoutAll_shouldSucceedAndRevokeTokens() throws Exception {
-        String token = getAccessToken("logout-user", "logout@test.com", "password123");
+        String token = getAccessToken("logout-user", "logout@test.com", "password123", "Polaris");
         User user = userRepository.findByIdentifierWithPlan("logout-user").orElseThrow();
 
         PasswordConfirmationRequest request = new PasswordConfirmationRequest();
