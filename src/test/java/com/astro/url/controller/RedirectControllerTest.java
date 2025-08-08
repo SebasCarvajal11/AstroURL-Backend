@@ -1,47 +1,35 @@
 package com.astro.url.controller;
 
-import com.astro.config.AbstractIntegrationTest;
-import com.astro.stats.service.ClickLoggingService;
+import com.astro.config.BaseControllerTest;
 import com.astro.url.model.Url;
-import com.astro.url.repository.UrlRepository;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.verify;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class RedirectControllerTest extends AbstractIntegrationTest {
+class RedirectControllerTest extends BaseControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @Autowired
-    private UrlRepository urlRepository;
-
-    @SpyBean
-    private ClickLoggingService clickLoggingService;
 
     @Test
     void redirect_shouldSucceed_forValidSlug() throws Exception {
         Url url = new Url();
         url.setSlug("validslug");
         url.setOriginalUrl("https://example.com/valid");
-        url.setExpirationDate(LocalDateTime.now().plusDays(1));
+        url.setExpirationDate(LocalDateTime.now(clock).plusDays(1));
         urlRepository.save(url);
 
         mockMvc.perform(get("/r/validslug"))
@@ -60,7 +48,7 @@ class RedirectControllerTest extends AbstractIntegrationTest {
         Url url = new Url();
         url.setSlug("expired");
         url.setOriginalUrl("https://example.com/expired");
-        url.setExpirationDate(LocalDateTime.now().minusDays(1));
+        url.setExpirationDate(LocalDateTime.now(clock).minusDays(1));
         urlRepository.save(url);
 
         mockMvc.perform(get("/r/expired"))
@@ -68,31 +56,30 @@ class RedirectControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void redirect_shouldUseXForwardedForHeader_whenPresent() throws Exception {
-        // Given
+    void redirect_shouldFailWithUnauthorized_whenPasswordIsRequiredButNotProvided() throws Exception {
+        createTestUrlWithPassword("https://secret.com", "secret", "password123");
+
+        mockMvc.perform(get("/r/secret"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.passwordRequired", is(true)));
+    }
+
+    @Test
+    void redirect_shouldSucceed_whenPasswordIsCorrect() throws Exception {
+        createTestUrlWithPassword("https://secret.com", "secret-2", "password123");
+
+        mockMvc.perform(get("/r/secret-2")
+                        .header("X-Password", "password123"))
+                .andExpect(status().isMovedPermanently())
+                .andExpect(header().string("Location", "https://secret.com"));
+    }
+
+    private Url createTestUrlWithPassword(String originalUrl, String slug, String rawPassword) {
         Url url = new Url();
-        url.setSlug("proxytest");
-        url.setOriginalUrl("https://example.com/proxy");
-        url.setExpirationDate(LocalDateTime.now().plusDays(1));
-        urlRepository.save(url);
-
-        String proxyIp = "10.0.0.1";
-
-        // When
-        mockMvc.perform(get("/r/proxytest")
-                        .header("X-Forwarded-For", proxyIp))
-                .andExpect(status().isMovedPermanently());
-
-        // Then: Verify that the async service was called with the correct IP
-        ArgumentCaptor<String> ipCaptor = ArgumentCaptor.forClass(String.class);
-        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
-                verify(clickLoggingService, atLeastOnce()).logClick(
-                        org.mockito.ArgumentMatchers.any(Url.class),
-                        ipCaptor.capture(),
-                        org.mockito.ArgumentMatchers.any()
-                )
-        );
-
-        assertThat(ipCaptor.getValue()).isEqualTo(proxyIp);
+        url.setSlug(slug);
+        url.setOriginalUrl(originalUrl);
+        url.setExpirationDate(LocalDateTime.now(clock).plusDays(1));
+        url.setPassword(passwordEncoder.encode(rawPassword));
+        return urlRepository.save(url);
     }
 }

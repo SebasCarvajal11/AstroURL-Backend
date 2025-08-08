@@ -6,6 +6,7 @@ import com.astro.stats.service.ClickLoggingService;
 import com.astro.url.dto.UrlResponse;
 import com.astro.url.mapper.UrlMapper;
 import com.astro.url.model.Url;
+import com.astro.url.protection.UrlProtectionService;
 import com.astro.url.repository.UrlRepository;
 import com.astro.user.model.User;
 import lombok.RequiredArgsConstructor;
@@ -27,18 +28,21 @@ public class UrlRetrievalService {
     private final UrlRepository urlRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final ClickLoggingService clickLoggingService;
+    private final UrlProtectionService urlProtectionService;
     private final Clock clock;
     private final UrlMapper urlMapper;
 
     @Transactional(readOnly = true)
-    public String getOriginalUrlAndLogClick(String slug, String ipAddress, String userAgent) {
+    public String getOriginalUrlAndLogClick(String slug, String ipAddress, String userAgent, String password) {
         String cacheKey = "url:slug:" + slug.toLowerCase();
         String cachedUrl = redisTemplate.opsForValue().get(cacheKey);
+
         if (cachedUrl != null) {
             handleCacheHit(slug, ipAddress, userAgent);
             return cachedUrl;
         }
-        return handleCacheMiss(slug, ipAddress, userAgent);
+
+        return handleCacheMiss(slug, ipAddress, userAgent, password);
     }
 
     @Transactional(readOnly = true)
@@ -49,13 +53,16 @@ public class UrlRetrievalService {
     }
 
     private void handleCacheHit(String slug, String ipAddress, String userAgent) {
-        urlRepository.findBySlug(slug.toLowerCase()).ifPresent(url ->
-                clickLoggingService.logClick(url, ipAddress, userAgent)
-        );
+        urlRepository.findBySlug(slug.toLowerCase()).ifPresent(url -> {
+            if (url.getExpirationDate().isAfter(LocalDateTime.now(clock))) {
+                clickLoggingService.logClick(url, ipAddress, userAgent);
+            }
+        });
     }
 
-    private String handleCacheMiss(String slug, String ipAddress, String userAgent) {
+    private String handleCacheMiss(String slug, String ipAddress, String userAgent, String password) {
         Url url = findAndValidateUrl(slug);
+        urlProtectionService.checkProtectionStatus(url, password);
         cacheUrl(url);
         clickLoggingService.logClick(url, ipAddress, userAgent);
         return url.getOriginalUrl();
@@ -65,6 +72,8 @@ public class UrlRetrievalService {
         Url url = urlRepository.findBySlug(slug.toLowerCase())
                 .orElseThrow(() -> new UrlNotFoundException(slug));
         if (url.getExpirationDate().isBefore(LocalDateTime.now(clock))) {
+            String cacheKey = "url:slug:" + slug.toLowerCase();
+            redisTemplate.delete(cacheKey);
             throw new UrlExpiredException(slug);
         }
         return url;

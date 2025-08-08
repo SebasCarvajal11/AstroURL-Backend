@@ -13,4 +13,6 @@ public class UrlShortenRequest {
 
     @ValidSlug
     private String slug;
+
+    private String password;
 }

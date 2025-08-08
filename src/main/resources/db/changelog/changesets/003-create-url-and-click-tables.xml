@@ -10,7 +10,7 @@
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-            <column name="slug" type="VARCHAR(15)">
+            <column name="slug" type="VARCHAR(10)">
                 <constraints nullable="false" unique="true" uniqueConstraintName="uq_urls_slug"/>
             </column>
             <column name="original_url" type="VARCHAR(2048)">

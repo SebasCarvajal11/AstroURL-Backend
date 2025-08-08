@@ -32,6 +32,10 @@ public class UrlUpdateService {
         Url url = findUrlById(urlId);
         ownershipValidator.validate(url, user);
 
+        if (request.getPassword() != null) {
+            validationService.checkCustomSlugPrivilege(user);
+        }
+
         applySlugUpdate(url, request.getSlug());
         applyOriginalUrlUpdate(url, request.getOriginalUrl());
         applyExpirationUpdate(url, request.getExpirationDate());
@@ -68,10 +72,12 @@ public class UrlUpdateService {
     }
 
     private void applyPasswordUpdate(Url url, String newPassword) {
-        if (StringUtils.hasText(newPassword)) {
-            url.setPassword(passwordEncoder.encode(newPassword));
-        } else if (newPassword != null) { // Handle empty string to remove password
-            url.setPassword(null);
+        if (newPassword != null) { // Allows setting and removing password
+            if (newPassword.isBlank()) {
+                url.setPassword(null);
+            } else {
+                url.setPassword(passwordEncoder.encode(newPassword));
+            }
         }
     }
 

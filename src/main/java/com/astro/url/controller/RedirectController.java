@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -24,14 +25,18 @@ public class RedirectController {
     private final HttpServletRequestUtils requestUtils;
 
     @GetMapping("/r/{slug}")
-    public ResponseEntity<Void> redirect(@PathVariable String slug, HttpServletRequest request) {
+    public ResponseEntity<Void> redirect(
+            @PathVariable String slug,
+            @RequestHeader(value = "X-Password", required = false) String password,
+            HttpServletRequest request) {
+
         String ipAddress = requestUtils.getClientIpAddress(request);
         if (!rateLimitingService.isRedirectAllowed(ipAddress)) {
             throw new RateLimitExceededException("Redirect rate limit exceeded.");
         }
 
         String userAgent = request.getHeader("User-Agent");
-        String originalUrl = urlRetrievalService.getOriginalUrlAndLogClick(slug, ipAddress, userAgent);
+        String originalUrl = urlRetrievalService.getOriginalUrlAndLogClick(slug, ipAddress, userAgent, password);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(originalUrl));

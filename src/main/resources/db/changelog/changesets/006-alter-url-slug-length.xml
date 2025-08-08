@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="009-alter-urls-slug-length" author="dev.astrourl">
+        <comment>Increase slug column length to 15 to accommodate longer custom slugs.</comment>
+        <modifyDataType
+                columnName="slug"
+                newDataType="VARCHAR(15)"
+                tableName="urls"/>
+    </changeSet>
+
+</databaseChangeLog>

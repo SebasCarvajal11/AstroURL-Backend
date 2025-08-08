@@ -22,6 +22,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(UrlAuthorizationException.class)
+    protected ResponseEntity<Object> handleUrlAuthorization(UrlAuthorizationException ex) {
+        if ("Password is required for this URL.".equals(ex.getMessage())) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("passwordRequired", true);
+            body.put("message", ex.getMessage());
+            return new ResponseEntity<>(body, HttpStatus.UNAUTHORIZED);
+        }
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+    }
+
     @ExceptionHandler(InvalidTokenException.class)
     protected ResponseEntity<Object> handleInvalidToken(InvalidTokenException ex) {
         ErrorResponse errorResponse = new ErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
@@ -34,10 +46,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
     }
 
-    @ExceptionHandler(UrlAuthorizationException.class)
-    protected ResponseEntity<Object> handleUrlAuthorization(UrlAuthorizationException ex) {
-        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.FORBIDDEN, ex.getMessage());
-        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+    @ExceptionHandler(UrlExpiredException.class)
+    public ResponseEntity<Object> handleUrlExpiredException(UrlExpiredException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.GONE, ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.GONE);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -88,11 +100,5 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         ErrorResponse errorResponse = new ErrorResponse((HttpStatus) status, "Validation failed", errors);
         return new ResponseEntity<>(errorResponse, status);
-    }
-
-    @ExceptionHandler(SlugAlreadyExistsException.class)
-    protected ResponseEntity<Object> handleSlugAlreadyExists(SlugAlreadyExistsException ex) {
-        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.CONFLICT, ex.getMessage());
-        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
     }
 }

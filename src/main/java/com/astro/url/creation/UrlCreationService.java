@@ -11,6 +11,7 @@ import com.astro.url.service.SlugService;
 import com.astro.url.validation.UrlValidationService;
 import com.astro.user.model.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -27,6 +28,7 @@ public class UrlCreationService {
     private final UrlMapper urlMapper;
     private final UrlValidationService urlValidationService;
     private final RateLimitingService rateLimitingService;
+    private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
     @Transactional
@@ -44,7 +46,7 @@ public class UrlCreationService {
         }
         String slug = determineSlug(request.getSlug(), user);
         int expirationDays = 14;
-        Url newUrl = persistUrl(request.getOriginalUrl(), slug, expirationDays, user);
+        Url newUrl = persistUrl(request.getOriginalUrl(), slug, expirationDays, user, request.getPassword());
         return urlMapper.toUrlResponse(newUrl, getBaseUrl(requestUrl));
     }
 
@@ -53,7 +55,7 @@ public class UrlCreationService {
             throw new RateLimitExceededException("Rate limit of 7 URLs per day exceeded for your IP address.");
         }
         String slug = generateUniqueRandomSlug(6);
-        Url newUrl = persistUrl(request.getOriginalUrl(), slug, 5, null);
+        Url newUrl = persistUrl(request.getOriginalUrl(), slug, 5, null, null);
         return urlMapper.toUrlResponse(newUrl, getBaseUrl(requestUrl));
     }
 
@@ -74,12 +76,21 @@ public class UrlCreationService {
         return slug;
     }
 
-    private Url persistUrl(String originalUrl, String slug, int expirationDays, User user) {
+    private Url persistUrl(String originalUrl, String slug, int expirationDays, User user, String password) {
         Url newUrl = new Url();
         newUrl.setOriginalUrl(originalUrl);
         newUrl.setSlug(slug);
         newUrl.setUser(user);
         newUrl.setExpirationDate(LocalDateTime.now(clock).plusDays(expirationDays));
+
+        if (StringUtils.hasText(password)) {
+            if (user == null) {
+                throw new IllegalStateException("Anonymous users cannot set passwords.");
+            }
+            urlValidationService.checkCustomSlugPrivilege(user);
+            newUrl.setPassword(passwordEncoder.encode(password));
+        }
+
         return urlRepository.save(newUrl);
     }
 
