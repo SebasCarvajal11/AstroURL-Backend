@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="010-add-expiration-fields-to-plans" author="dev.astrourl">
+        <addColumn tableName="plans">
+            <column name="default_expiration_days" type="INT" defaultValueNumeric="14">
+                <constraints nullable="false"/>
+            </column>
+            <column name="max_expiration_days" type="INT" defaultValueNumeric="14">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-update-plan-expiration-data" author="dev.astrourl">
+        <update tableName="plans">
+            <column name="default_expiration_days" value="30"/>
+            <column name="max_expiration_days" value="365"/>
+            <where>name = 'Sirio'</where>
+        </update>
+    </changeSet>
+
+</databaseChangeLog>

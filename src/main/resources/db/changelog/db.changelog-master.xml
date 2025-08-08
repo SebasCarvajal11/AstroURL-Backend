@@ -11,5 +11,6 @@
     <include file="db/changelog/changesets/004-add-index-on-expiration-date.xml"/>
     <include file="db/changelog/changesets/005-add-click-count-to-urls.xml"/>
     <include file="db/changelog/changesets/006-alter-url-slug-length.xml"/>
+    <include file="db/changelog/changesets/007-add-expiration-fields-to-plans.xml"/>
 
 </databaseChangeLog>

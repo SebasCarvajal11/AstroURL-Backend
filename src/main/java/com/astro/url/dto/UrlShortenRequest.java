@@ -1,18 +1,20 @@
 package com.astro.url.dto;
-
 import com.astro.shared.annotations.ValidSlug;
 import com.astro.shared.annotations.ValidUrl;
+import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
-
+import java.time.LocalDateTime;
 @Data
 public class UrlShortenRequest {
     @NotBlank
     @ValidUrl(message = "Must be a valid URL format (e.g., http://example.com or https://example.com)")
     private String originalUrl;
-
     @ValidSlug
     private String slug;
 
     private String password;
+
+    @Future(message = "Expiration date must be in the future.")
+    private LocalDateTime expirationDate;
 }

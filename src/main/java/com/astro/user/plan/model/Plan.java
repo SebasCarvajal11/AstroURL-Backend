@@ -25,4 +25,10 @@ public class Plan {
 
     @Column(nullable = false)
     private boolean customSlugEnabled;
+
+    @Column(nullable = false)
+    private int defaultExpirationDays;
+
+    @Column(nullable = false)
+    private int maxExpirationDays;
 }
