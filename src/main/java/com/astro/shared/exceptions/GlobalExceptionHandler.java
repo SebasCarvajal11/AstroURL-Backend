@@ -89,4 +89,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ErrorResponse errorResponse = new ErrorResponse((HttpStatus) status, "Validation failed", errors);
         return new ResponseEntity<>(errorResponse, status);
     }
+
+    @ExceptionHandler(SlugAlreadyExistsException.class)
+    protected ResponseEntity<Object> handleSlugAlreadyExists(SlugAlreadyExistsException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.CONFLICT, ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
 }

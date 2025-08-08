@@ -23,8 +23,7 @@ public class TokenControllerTest extends BaseControllerTest {
 
     @Test
     void refreshToken_shouldSucceed_whenTokenIsValid() throws Exception {
-        String tokenJson = getAuthTokenJson("refresh-user", "refresh@test.com", "password123");
-        LoginResponse loginResponse = objectMapper.readValue(tokenJson, LoginResponse.class);
+        LoginResponse loginResponse = getLoginResponse("refresh-user", "refresh@test.com", "password123");
 
         when(clock.instant()).thenReturn(MOCK_TIME_LATER);
         RefreshTokenRequest refreshRequest = new RefreshTokenRequest();

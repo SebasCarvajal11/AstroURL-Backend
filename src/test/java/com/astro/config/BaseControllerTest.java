@@ -3,6 +3,7 @@ package com.astro.config;
 import com.astro.auth.dto.LoginRequest;
 import com.astro.auth.dto.LoginResponse;
 import com.astro.stats.repository.ClickRepository;
+import com.astro.url.model.Url;
 import com.astro.url.repository.UrlRepository;
 import com.astro.user.model.User;
 import com.astro.user.plan.model.Plan;
@@ -18,10 +19,10 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 import static org.mockito.Mockito.when;
@@ -56,11 +57,10 @@ public abstract class BaseControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void baseSetUp() {
-        redisTemplate.getConnectionFactory().getConnection().flushDb();
-
         clickRepository.deleteAll();
         urlRepository.deleteAll();
         userRepository.deleteAll();
+        redisTemplate.getConnectionFactory().getConnection().flushDb();
 
         when(clock.instant()).thenReturn(MOCK_TIME_NOW);
         when(clock.getZone()).thenReturn(ZoneId.systemDefault());
@@ -76,22 +76,31 @@ public abstract class BaseControllerTest extends AbstractIntegrationTest {
         return userRepository.save(user);
     }
 
-    protected String getAuthTokenJson(String username, String email, String rawPassword) throws Exception {
+    protected Url createTestUrl(String originalUrl, String slug, User user) {
+        Url url = new Url();
+        url.setOriginalUrl(originalUrl);
+        url.setSlug(slug);
+        url.setUser(user);
+        url.setExpirationDate(LocalDateTime.now(clock).plusDays(10));
+        return urlRepository.save(url);
+    }
+
+    protected LoginResponse getLoginResponse(String username, String email, String rawPassword) throws Exception {
         createTestUser(username, email, rawPassword);
         LoginRequest loginRequest = new LoginRequest();
         loginRequest.setLoginIdentifier(username);
         loginRequest.setPassword(rawPassword);
 
-        return mockMvc.perform(post("/api/auth/login")
+        String jsonResponse = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
+
+        return objectMapper.readValue(jsonResponse, LoginResponse.class);
     }
 
     protected String getAccessToken(String username, String email, String rawPassword) throws Exception {
-        String jsonResponse = getAuthTokenJson(username, email, rawPassword);
-        LoginResponse loginResponse = objectMapper.readValue(jsonResponse, LoginResponse.class);
-        return loginResponse.getAccessToken();
+        return getLoginResponse(username, email, rawPassword).getAccessToken();
     }
 }

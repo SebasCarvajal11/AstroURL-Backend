@@ -2,8 +2,8 @@ package com.astro.url.controller;
 
 import com.astro.shared.exceptions.RateLimitExceededException;
 import com.astro.shared.utils.HttpServletRequestUtils;
+import com.astro.url.retrieval.UrlRetrievalService;
 import com.astro.url.service.RateLimitingService;
-import com.astro.url.service.UrlService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -19,7 +19,7 @@ import java.net.URI;
 @RequiredArgsConstructor
 public class RedirectController {
 
-    private final UrlService urlService;
+    private final UrlRetrievalService urlRetrievalService;
     private final RateLimitingService rateLimitingService;
     private final HttpServletRequestUtils requestUtils;
 
@@ -31,7 +31,7 @@ public class RedirectController {
         }
 
         String userAgent = request.getHeader("User-Agent");
-        String originalUrl = urlService.getOriginalUrlAndLogClick(slug, ipAddress, userAgent);
+        String originalUrl = urlRetrievalService.getOriginalUrlAndLogClick(slug, ipAddress, userAgent);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(originalUrl));
