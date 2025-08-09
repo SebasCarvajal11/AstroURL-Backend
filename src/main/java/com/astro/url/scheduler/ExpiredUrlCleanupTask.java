@@ -1,5 +1,6 @@
 package com.astro.url.scheduler;
 
+import com.astro.config.RedisKeyManager; // Importar
 import com.astro.url.model.Url;
 import com.astro.url.repository.UrlRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +27,9 @@ public class ExpiredUrlCleanupTask {
     private final UrlRepository urlRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final Clock clock;
+    private final RedisKeyManager redisKeyManager; // Inyectar
 
-    @Scheduled(cron = "0 0 0 * * ?") // Runs daily at midnight UTC
+    @Scheduled(cron = "0 0 0 * * ?")
     @Transactional
     public void cleanupExpiredUrls() {
         logger.info("Starting expired URL cleanup task.");
@@ -41,12 +43,12 @@ public class ExpiredUrlCleanupTask {
             List<Url> urlsToDelete = expiredUrlsPage.getContent();
             if (!urlsToDelete.isEmpty()) {
                 // Invalidate cache entries
+                // CORRECCIÓN: Usar el key manager
                 List<String> cacheKeys = urlsToDelete.stream()
-                        .map(url -> "url:slug:" + url.getSlug().toLowerCase())
+                        .map(url -> redisKeyManager.getUrlCacheKey(url.getSlug()))
                         .toList();
                 redisTemplate.delete(cacheKeys);
 
-                // Delete from database
                 urlRepository.deleteAllInBatch(urlsToDelete);
 
                 totalDeleted += urlsToDelete.size();

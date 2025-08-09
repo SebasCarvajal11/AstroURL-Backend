@@ -1,15 +1,17 @@
 package com.astro.url.retrieval;
 
+import com.astro.config.RedisKeyManager; // Importar
 import com.astro.shared.exceptions.UrlExpiredException;
 import com.astro.shared.exceptions.UrlNotFoundException;
-import com.astro.stats.service.ClickLoggingService;
 import com.astro.url.dto.UrlResponse;
+import com.astro.url.event.UrlAccessedEvent;
 import com.astro.url.mapper.UrlMapper;
 import com.astro.url.model.Url;
 import com.astro.url.protection.UrlProtectionService;
 import com.astro.url.repository.UrlRepository;
 import com.astro.user.model.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -27,14 +29,16 @@ public class UrlRetrievalService {
 
     private final UrlRepository urlRepository;
     private final RedisTemplate<String, String> redisTemplate;
-    private final ClickLoggingService clickLoggingService;
+    private final ApplicationEventPublisher eventPublisher;
     private final UrlProtectionService urlProtectionService;
     private final Clock clock;
     private final UrlMapper urlMapper;
+    private final RedisKeyManager redisKeyManager; // Inyectar
 
     @Transactional(readOnly = true)
     public String getOriginalUrlAndLogClick(String slug, String ipAddress, String userAgent, String password) {
-        String cacheKey = "url:slug:" + slug.toLowerCase();
+        // CORRECCIÓN: Usar el key manager
+        String cacheKey = redisKeyManager.getUrlCacheKey(slug);
         String cachedUrl = redisTemplate.opsForValue().get(cacheKey);
 
         if (cachedUrl != null) {
@@ -55,7 +59,7 @@ public class UrlRetrievalService {
     private void handleCacheHit(String slug, String ipAddress, String userAgent) {
         urlRepository.findBySlug(slug.toLowerCase()).ifPresent(url -> {
             if (url.getExpirationDate().isAfter(LocalDateTime.now(clock))) {
-                clickLoggingService.logClick(url, ipAddress, userAgent);
+                eventPublisher.publishEvent(new UrlAccessedEvent(url, ipAddress, userAgent));
             }
         });
     }
@@ -64,7 +68,7 @@ public class UrlRetrievalService {
         Url url = findAndValidateUrl(slug);
         urlProtectionService.checkProtectionStatus(url, password);
         cacheUrl(url);
-        clickLoggingService.logClick(url, ipAddress, userAgent);
+        eventPublisher.publishEvent(new UrlAccessedEvent(url, ipAddress, userAgent));
         return url.getOriginalUrl();
     }
 
@@ -72,7 +76,8 @@ public class UrlRetrievalService {
         Url url = urlRepository.findBySlug(slug.toLowerCase())
                 .orElseThrow(() -> new UrlNotFoundException(slug));
         if (url.getExpirationDate().isBefore(LocalDateTime.now(clock))) {
-            String cacheKey = "url:slug:" + slug.toLowerCase();
+            // CORRECCIÓN: Usar el key manager
+            String cacheKey = redisKeyManager.getUrlCacheKey(slug);
             redisTemplate.delete(cacheKey);
             throw new UrlExpiredException(slug);
         }
@@ -82,7 +87,8 @@ public class UrlRetrievalService {
     private void cacheUrl(Url url) {
         long ttl = Duration.between(LocalDateTime.now(clock), url.getExpirationDate()).getSeconds();
         if (ttl > 0) {
-            String cacheKey = "url:slug:" + url.getSlug().toLowerCase();
+            // CORRECCIÓN: Usar el key manager
+            String cacheKey = redisKeyManager.getUrlCacheKey(url.getSlug());
             redisTemplate.opsForValue().set(cacheKey, url.getOriginalUrl(), ttl + 60, TimeUnit.SECONDS);
         }
     }

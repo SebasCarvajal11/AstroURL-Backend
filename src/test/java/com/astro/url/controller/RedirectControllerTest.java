@@ -2,6 +2,7 @@ package com.astro.url.controller;
 
 import com.astro.config.BaseControllerTest;
 import com.astro.url.model.Url;
+import com.astro.user.model.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -26,10 +27,8 @@ class RedirectControllerTest extends BaseControllerTest {
 
     @Test
     void redirect_shouldSucceed_forValidSlug() throws Exception {
-        Url url = new Url();
-        url.setSlug("validslug");
-        url.setOriginalUrl("https://example.com/valid");
-        url.setExpirationDate(LocalDateTime.now(clock).plusDays(1));
+        // CORRECCIÓN: Usamos el factory method para URLs anónimas
+        Url url = Url.createAnonymousUrl("https://example.com/valid", "validslug", LocalDateTime.now(clock).plusDays(1));
         urlRepository.save(url);
 
         mockMvc.perform(get("/r/validslug"))
@@ -45,10 +44,8 @@ class RedirectControllerTest extends BaseControllerTest {
 
     @Test
     void redirect_shouldFailWith410_forExpiredSlug() throws Exception {
-        Url url = new Url();
-        url.setSlug("expired");
-        url.setOriginalUrl("https://example.com/expired");
-        url.setExpirationDate(LocalDateTime.now(clock).minusDays(1));
+        // CORRECCIÓN: Usamos el factory method para URLs anónimas
+        Url url = Url.createAnonymousUrl("https://example.com/expired", "expired", LocalDateTime.now(clock).minusDays(1));
         urlRepository.save(url);
 
         mockMvc.perform(get("/r/expired"))
@@ -74,12 +71,23 @@ class RedirectControllerTest extends BaseControllerTest {
                 .andExpect(header().string("Location", "https://secret.com"));
     }
 
+    /**
+     * CORRECCIÓN: Este método ahora debe crear un usuario, porque nuestra lógica de dominio
+     * enriquecida solo permite contraseñas para usuarios autenticados (plan Sirio).
+     * Usamos el factory method para URLs autenticadas.
+     */
     private Url createTestUrlWithPassword(String originalUrl, String slug, String rawPassword) {
-        Url url = new Url();
-        url.setSlug(slug);
-        url.setOriginalUrl(originalUrl);
-        url.setExpirationDate(LocalDateTime.now(clock).plusDays(1));
-        url.setPassword(passwordEncoder.encode(rawPassword));
+        // La protección con contraseña requiere un usuario con un plan que lo permita (ej. Sirio)
+        User user = createTestUser("pwd-user-" + slug, "pwd-user-" + slug + "@test.com", "defaultPass", "Sirio");
+
+        Url url = Url.createAuthenticatedUrl(
+                originalUrl,
+                slug,
+                user,
+                LocalDateTime.now(clock).plusDays(1),
+                rawPassword,
+                passwordEncoder::encode
+        );
         return urlRepository.save(url);
     }
 }

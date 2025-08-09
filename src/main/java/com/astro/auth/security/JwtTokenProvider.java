@@ -29,31 +29,32 @@ public class JwtTokenProvider {
     @Value("${jwt.expiration.access-ms}")
     private long jwtExpirationInMs;
 
+    // Aún es útil tenerlo aquí, pero podría moverse a properties.
     private final long refreshTokenExpirationInMs = 604800000L; // 7 days
-    private final Clock clock; // Inyectamos el reloj
+    private final Clock clock;
 
     public String generateToken(Authentication authentication) {
         User userPrincipal = (User) authentication.getPrincipal();
-        Date now = Date.from(clock.instant()); // Usamos el reloj
-        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
-
-        return Jwts.builder()
-                .setSubject(userPrincipal.getUsername())
-                .claim("userId", userPrincipal.getId())
-                .setIssuedAt(now) // Usamos nuestra variable 'now'
-                .setExpiration(expiryDate)
-                .signWith(getSignInKey(), SignatureAlgorithm.HS512)
-                .compact();
+        return buildToken(userPrincipal, jwtExpirationInMs);
     }
 
     public String generateRefreshToken(Authentication authentication) {
         User userPrincipal = (User) authentication.getPrincipal();
-        Date now = Date.from(clock.instant()); // Usamos el reloj
-        Date expiryDate = new Date(now.getTime() + refreshTokenExpirationInMs);
+        return buildToken(userPrincipal, refreshTokenExpirationInMs);
+    }
+
+    /**
+     * CORRECCIÓN: Método privado que centraliza la lógica de construcción de tokens,
+     * eliminando la duplicación de código.
+     */
+    private String buildToken(User userPrincipal, long expirationInMs) {
+        Date now = Date.from(clock.instant());
+        Date expiryDate = new Date(now.getTime() + expirationInMs);
 
         return Jwts.builder()
                 .setSubject(userPrincipal.getUsername())
-                .setIssuedAt(now) // Usamos nuestra variable 'now'
+                .claim("userId", userPrincipal.getId())
+                .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSignInKey(), SignatureAlgorithm.HS512)
                 .compact();

@@ -48,10 +48,11 @@ public class AuthService {
         return tokenHandler.handleTokenRefresh(refreshToken);
     }
 
-    public void logoutAll(User currentUser, String providedPassword) {
-        if (!authValidator.isPasswordCorrect(currentUser, providedPassword)) {
-            throw new IllegalArgumentException("Incorrect password provided.");
-        }
+    /**
+     * CORRECCIÓN: El método ya no recibe la contraseña y no realiza la validación.
+     * La lógica se delega directamente al TokenHandler.
+     */
+    public void logoutAll(User currentUser) {
         tokenHandler.handleLogoutAll(currentUser);
         logger.info("User {} successfully logged out from all devices.", currentUser.getUsername());
     }

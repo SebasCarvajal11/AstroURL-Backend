@@ -1,5 +1,6 @@
 package com.astro.url.update;
 
+import com.astro.config.RedisKeyManager; // Importar
 import com.astro.shared.exceptions.UrlNotFoundException;
 import com.astro.url.dto.UrlResponse;
 import com.astro.url.dto.UrlUpdateRequest;
@@ -26,20 +27,27 @@ public class UrlUpdateService {
     private final PasswordEncoder passwordEncoder;
     private final RedisTemplate<String, String> redisTemplate;
     private final UrlMapper urlMapper;
+    private final RedisKeyManager redisKeyManager; // Inyectar
 
     @Transactional
     public UrlResponse updateUrl(Long urlId, UrlUpdateRequest request, User user, String requestUrl) {
         Url url = findUrlById(urlId);
         ownershipValidator.validate(url, user);
 
-        if (request.getPassword() != null) {
+        if (request.getPassword() != null || StringUtils.hasText(request.getSlug())) {
             validationService.checkCustomSlugPrivilege(user);
         }
 
-        applySlugUpdate(url, request.getSlug());
-        applyOriginalUrlUpdate(url, request.getOriginalUrl());
-        applyExpirationUpdate(url, request.getExpirationDate());
-        applyPasswordUpdate(url, request.getPassword());
+        String oldSlug = url.getSlug();
+
+        url.changeSlug(request.getSlug(), () -> validationService.isSlugAvailable(request.getSlug()));
+        url.updateOriginalUrl(request.getOriginalUrl());
+        url.updateExpirationDate(request.getExpirationDate());
+        url.updatePassword(request.getPassword(), passwordEncoder::encode);
+
+        if (!oldSlug.equalsIgnoreCase(url.getSlug())) {
+            invalidateCacheForSlug(oldSlug);
+        }
 
         Url updatedUrl = urlRepository.save(url);
         String baseUrl = requestUrl.substring(0, requestUrl.indexOf("/api/"));
@@ -51,38 +59,9 @@ public class UrlUpdateService {
                 .orElseThrow(() -> new UrlNotFoundException("URL with ID " + id + " not found."));
     }
 
-    private void applySlugUpdate(Url url, String newSlug) {
-        if (StringUtils.hasText(newSlug) && !newSlug.equalsIgnoreCase(url.getSlug())) {
-            validationService.checkSlugAvailability(newSlug);
-            invalidateCacheForSlug(url.getSlug());
-            url.setSlug(newSlug.toLowerCase());
-        }
-    }
-
-    private void applyOriginalUrlUpdate(Url url, String newOriginalUrl) {
-        if (StringUtils.hasText(newOriginalUrl)) {
-            url.setOriginalUrl(newOriginalUrl);
-        }
-    }
-
-    private void applyExpirationUpdate(Url url, java.time.LocalDateTime newExpirationDate) {
-        if (newExpirationDate != null) {
-            url.setExpirationDate(newExpirationDate);
-        }
-    }
-
-    private void applyPasswordUpdate(Url url, String newPassword) {
-        if (newPassword != null) { // Allows setting and removing password
-            if (newPassword.isBlank()) {
-                url.setPassword(null);
-            } else {
-                url.setPassword(passwordEncoder.encode(newPassword));
-            }
-        }
-    }
-
     private void invalidateCacheForSlug(String slug) {
-        String cacheKey = "url:slug:" + slug.toLowerCase();
+        // CORRECCIÓN: Usar el key manager
+        String cacheKey = redisKeyManager.getUrlCacheKey(slug);
         redisTemplate.delete(cacheKey);
     }
 }

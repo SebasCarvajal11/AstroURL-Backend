@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -28,6 +29,11 @@ class UrlRepositoryTest extends AbstractIntegrationTest {
     @Autowired
     private PlanRepository planRepository;
 
+    // PasswordEncoder no se inyecta por defecto en tests @DataJpaTest,
+    // pero lo necesitamos para nuestro factory method. Lo simulamos.
+    private final PasswordEncoder passwordEncoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+
+
     private User testUser;
 
     @BeforeEach
@@ -43,12 +49,15 @@ class UrlRepositoryTest extends AbstractIntegrationTest {
 
     @Test
     void whenSaveAndFindBySlug_thenUrlIsFound() {
-        // Given
-        Url url = new Url();
-        url.setSlug("testslug");
-        url.setOriginalUrl("https://google.com");
-        url.setExpirationDate(LocalDateTime.now().plusDays(1));
-        url.setUser(testUser);
+        // CORRECCIÓN: Usamos el factory method para crear la instancia de Url
+        Url url = Url.createAuthenticatedUrl(
+                "https://google.com",
+                "testslug",
+                testUser,
+                LocalDateTime.now().plusDays(1),
+                null, // sin contraseña
+                passwordEncoder::encode
+        );
 
         // When
         urlRepository.save(url);

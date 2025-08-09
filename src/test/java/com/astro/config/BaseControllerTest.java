@@ -5,6 +5,7 @@ import com.astro.auth.dto.LoginResponse;
 import com.astro.stats.repository.ClickRepository;
 import com.astro.url.model.Url;
 import com.astro.url.repository.UrlRepository;
+import com.astro.user.UserBuilder; // Importar el UserBuilder
 import com.astro.user.model.User;
 import com.astro.user.plan.model.Plan;
 import com.astro.user.plan.repository.PlanRepository;
@@ -67,23 +68,33 @@ public abstract class BaseControllerTest extends AbstractIntegrationTest {
         when(clock.getZone()).thenReturn(ZoneId.systemDefault());
     }
 
+    /**
+     * CORRECCIÓN: El método ahora utiliza el UserBuilder para crear la instancia de User,
+     * haciendo el código más limpio y mantenible.
+     */
     protected User createTestUser(String username, String email, String rawPassword, String planName) {
         Plan plan = planRepository.findByName(planName)
                 .orElseThrow(() -> new IllegalStateException("Plan not found: " + planName));
-        User user = new User();
-        user.setUsername(username);
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(rawPassword));
-        user.setPlan(plan);
+
+        User user = new UserBuilder()
+                .withUsername(username)
+                .withEmail(email)
+                .withPassword(rawPassword)
+                .withPlan(plan)
+                .build(passwordEncoder);
+
         return userRepository.save(user);
     }
 
     protected Url createTestUrl(String originalUrl, String slug, User user) {
-        Url url = new Url();
-        url.setOriginalUrl(originalUrl);
-        url.setSlug(slug);
-        url.setUser(user);
-        url.setExpirationDate(LocalDateTime.now(clock).plusDays(10));
+        Url url = Url.createAuthenticatedUrl(
+                originalUrl,
+                slug,
+                user,
+                LocalDateTime.now(clock).plusDays(10),
+                null,
+                passwordEncoder::encode
+        );
         return urlRepository.save(url);
     }
 

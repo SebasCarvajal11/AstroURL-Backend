@@ -2,6 +2,7 @@ package com.astro.auth.token;
 
 import com.astro.auth.dto.LoginResponse;
 import com.astro.auth.security.JwtTokenProvider;
+import com.astro.config.RedisKeyManager; // Importar
 import com.astro.user.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -16,6 +17,7 @@ public class TokenGenerationService {
 
     private final JwtTokenProvider tokenProvider;
     private final RedisTemplate<String, String> redisTemplate;
+    private final RedisKeyManager redisKeyManager; // Inyectar
 
     public LoginResponse generateAndStoreTokens(Authentication authentication) {
         String accessToken = tokenProvider.generateToken(authentication);
@@ -26,7 +28,8 @@ public class TokenGenerationService {
 
     private void storeRefreshToken(Authentication authentication, String refreshToken) {
         User userPrincipal = (User) authentication.getPrincipal();
-        String redisKey = "user:refreshToken:" + userPrincipal.getId();
+        // CORRECCIÓN: Usar el key manager
+        String redisKey = redisKeyManager.getRefreshTokenKey(userPrincipal.getId());
         redisTemplate.opsForValue().set(redisKey, refreshToken, 7, TimeUnit.DAYS);
     }
 }

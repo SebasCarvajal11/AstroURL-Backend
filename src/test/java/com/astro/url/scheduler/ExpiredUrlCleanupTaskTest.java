@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -30,6 +30,9 @@ class ExpiredUrlCleanupTaskTest extends AbstractIntegrationTest {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
+    @Autowired // Necesitamos el PasswordEncoder real del contexto de Spring
+    private PasswordEncoder passwordEncoder;
+
     @MockBean
     private Clock clock;
 
@@ -40,19 +43,22 @@ class ExpiredUrlCleanupTaskTest extends AbstractIntegrationTest {
         when(clock.instant()).thenReturn(now);
         when(clock.getZone()).thenReturn(ZoneId.of("UTC"));
 
+        // CORRECCIÓN: Usamos el factory method para crear las URLs de prueba
         // And: One expired URL with a cached entry
-        Url expiredUrl = new Url();
-        expiredUrl.setSlug("expired");
-        expiredUrl.setOriginalUrl("https://expired.com");
-        expiredUrl.setExpirationDate(LocalDateTime.now(clock).minusDays(1));
+        Url expiredUrl = Url.createAnonymousUrl(
+                "https://expired.com",
+                "expired",
+                LocalDateTime.now(clock).minusDays(1)
+        );
         urlRepository.save(expiredUrl);
         redisTemplate.opsForValue().set("url:slug:expired", "https://expired.com");
 
         // And: One active URL with a cached entry
-        Url activeUrl = new Url();
-        activeUrl.setSlug("active");
-        activeUrl.setOriginalUrl("https://active.com");
-        activeUrl.setExpirationDate(LocalDateTime.now(clock).plusDays(1));
+        Url activeUrl = Url.createAnonymousUrl(
+                "https://active.com",
+                "active",
+                LocalDateTime.now(clock).plusDays(1)
+        );
         urlRepository.save(activeUrl);
         redisTemplate.opsForValue().set("url:slug:active", "https://active.com");
 

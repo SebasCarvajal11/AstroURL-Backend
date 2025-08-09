@@ -25,6 +25,17 @@ public class UrlValidationService {
         }
     }
 
+    /**
+     * Nuevo método para verificar si el plan del usuario permite proteger URLs con contraseña.
+     * Actualmente, esta capacidad va ligada a poder usar slugs personalizados.
+     * @param user El usuario a verificar.
+     */
+    public void checkPasswordPrivilege(User user) {
+        if (!user.getPlan().isCustomSlugEnabled()) { // Reutilizamos la misma lógica de plan
+            throw new UrlAuthorizationException("Your current plan does not allow password-protected URLs.");
+        }
+    }
+
     public boolean isSlugAvailable(String slug) {
         return urlRepository.findBySlug(slug.toLowerCase()).isEmpty();
     }

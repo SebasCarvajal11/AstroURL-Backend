@@ -1,10 +1,8 @@
 package com.astro.auth.controller;
 
 import com.astro.auth.dto.LoginResponse;
-import com.astro.auth.dto.PasswordConfirmationRequest;
 import com.astro.auth.dto.RefreshTokenRequest;
 import com.astro.config.BaseControllerTest;
-import com.astro.user.model.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
@@ -54,17 +52,16 @@ public class TokenControllerTest extends BaseControllerTest {
     @Test
     void logoutAll_shouldSucceedAndRevokeTokens() throws Exception {
         String token = getAccessToken("logout-user", "logout@test.com", "password123", "Polaris");
-        User user = userRepository.findByIdentifierWithPlan("logout-user").orElseThrow();
 
-        PasswordConfirmationRequest request = new PasswordConfirmationRequest();
-        request.setCurrentPassword("password123");
-
+        /**
+         * CORRECCIÓN: La llamada al endpoint ya no incluye un cuerpo de petición (body).
+         * Simplemente se hace el POST con el header de autorización.
+         */
         mockMvc.perform(post("/api/auth/logout-all")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
 
+        // Verificamos que el token antiguo ya no es válido para acceder a recursos protegidos.
         mockMvc.perform(get("/api/profile").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
     }

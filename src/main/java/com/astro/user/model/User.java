@@ -13,7 +13,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Stream;
 
 @Entity
 @Table(name = "users")
@@ -28,8 +27,13 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(nullable = false, unique = true, length = 100)
-    private String email;
+    /**
+     * CORRECCIÓN: Se reemplaza el campo 'email' de tipo String
+     * por nuestro nuevo Value Object 'Email'.
+     * La anotación @Embedded le indica a JPA cómo mapear este objeto.
+     */
+    @Embedded
+    private Email email;
 
     @Column(nullable = false)
     private String password;
@@ -45,6 +49,23 @@ public class User implements UserDetails {
     @UpdateTimestamp
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    /**
+     * Método de conveniencia para obtener el valor del email como String.
+     * @return El email como String.
+     */
+    public String getEmail() {
+        return this.email != null ? this.email.value() : null;
+    }
+
+    /**
+     * Método de conveniencia para establecer el email a partir de un String.
+     * La validación ocurrirá al crear la nueva instancia de Email.
+     * @param emailString El email como String a establecer.
+     */
+    public void setEmail(String emailString) {
+        this.email = new Email(emailString);
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -1,6 +1,7 @@
 package com.astro.auth.handler;
 
 import com.astro.auth.dto.RegisterRequest;
+import com.astro.auth.exception.PasswordMismatchException; // Importar la nueva excepción
 import com.astro.shared.exceptions.UserAlreadyExistsException;
 import com.astro.user.model.User;
 import com.astro.user.plan.model.Plan;
@@ -26,7 +27,8 @@ public class RegistrationHandler {
 
     private void validatePasswordConfirmation(RegisterRequest request) {
         if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("Passwords do not match.");
+            // CORRECCIÓN: Se lanza la nueva excepción específica en lugar de IllegalArgumentException.
+            throw new PasswordMismatchException("Passwords do not match.");
         }
     }
 

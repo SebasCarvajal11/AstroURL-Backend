@@ -1,9 +1,10 @@
 package com.astro.auth.handler;
 
 import com.astro.auth.dto.LoginResponse;
+import com.astro.auth.security.JwtTokenProvider;
 import com.astro.auth.token.TokenGenerationService;
 import com.astro.auth.token.TokenRevocationService;
-import com.astro.auth.security.JwtTokenProvider;
+import com.astro.config.RedisKeyManager; // Importar
 import com.astro.shared.exceptions.TokenRefreshException;
 import com.astro.user.model.User;
 import com.astro.user.repository.UserRepository;
@@ -23,6 +24,7 @@ public class TokenHandler {
     private final TokenGenerationService tokenGenerationService;
     private final TokenRevocationService tokenRevocationService;
     private final RedisTemplate<String, String> redisTemplate;
+    private final RedisKeyManager redisKeyManager; // Inyectar
 
     public LoginResponse handleTokenRefresh(String refreshToken) {
         validateRefreshToken(refreshToken);
@@ -45,7 +47,8 @@ public class TokenHandler {
     }
 
     private void validateStoredToken(User user, String token) {
-        String redisKey = "user:refreshToken:" + user.getId();
+        // CORRECCIÓN: Usar el key manager
+        String redisKey = redisKeyManager.getRefreshTokenKey(user.getId());
         String storedToken = redisTemplate.opsForValue().get(redisKey);
         if (storedToken == null || !storedToken.equals(token)) {
             throw new TokenRefreshException(token, "Refresh token is not in store or does not match. Please log in again.");

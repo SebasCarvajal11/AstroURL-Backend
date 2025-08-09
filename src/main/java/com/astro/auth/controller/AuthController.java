@@ -63,11 +63,15 @@ public class AuthController {
         return ResponseEntity.ok(new ApiResponse(true, "Your password has been reset successfully."));
     }
 
+    /**
+     * CORRECCIÓN: El método ya no recibe un cuerpo de petición con la contraseña.
+     * La autorización se basa únicamente en el token JWT del usuario autenticado.
+     */
     @PostMapping("/logout-all")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> logoutAll(Authentication authentication, @Valid @RequestBody PasswordConfirmationRequest request) {
+    public ResponseEntity<Void> logoutAll(Authentication authentication) {
         User currentUser = (User) authentication.getPrincipal();
-        authService.logoutAll(currentUser, request.getCurrentPassword());
+        authService.logoutAll(currentUser);
         return ResponseEntity.noContent().build();
     }
 }

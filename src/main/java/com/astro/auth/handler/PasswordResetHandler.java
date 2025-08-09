@@ -2,6 +2,8 @@ package com.astro.auth.handler;
 
 import com.astro.auth.dto.ForgotPasswordRequest;
 import com.astro.auth.dto.ResetPasswordRequest;
+import com.astro.auth.exception.PasswordMismatchException;
+import com.astro.config.RedisKeyManager; // Importar
 import com.astro.shared.exceptions.InvalidTokenException;
 import com.astro.shared.service.EmailService;
 import com.astro.user.model.User;
@@ -24,11 +26,12 @@ public class PasswordResetHandler {
     private final RedisTemplate<String, String> redisTemplate;
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
+    private final RedisKeyManager redisKeyManager; // Inyectar
 
     @Value("${astrourl.frontend.reset-password-url}")
     private String resetPasswordUrlBase;
 
-    private static final String RESET_TOKEN_PREFIX = "user:resetToken:";
+    // ELIMINAR: private static final String RESET_TOKEN_PREFIX = "user:resetToken:";
 
     public void handleForgotPassword(ForgotPasswordRequest request) {
         Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
@@ -49,19 +52,21 @@ public class PasswordResetHandler {
 
     private String generateAndStoreResetToken(User user) {
         String token = UUID.randomUUID().toString();
-        String redisKey = RESET_TOKEN_PREFIX + token;
+        // CORRECCIÓN: Usar el key manager
+        String redisKey = redisKeyManager.getPasswordResetTokenKey(token);
         redisTemplate.opsForValue().set(redisKey, user.getId().toString(), 15, TimeUnit.MINUTES);
         return token;
     }
 
     private void validatePasswordConfirmation(ResetPasswordRequest request) {
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("Passwords do not match.");
+            throw new PasswordMismatchException("Passwords do not match.");
         }
     }
 
     private String validateAndRetrieveUserIdFromToken(String token) {
-        String redisKey = RESET_TOKEN_PREFIX + token;
+        // CORRECCIÓN: Usar el key manager
+        String redisKey = redisKeyManager.getPasswordResetTokenKey(token);
         String userId = redisTemplate.opsForValue().get(redisKey);
         if (userId == null) {
             throw new InvalidTokenException("Invalid or expired password reset token.");
@@ -80,6 +85,7 @@ public class PasswordResetHandler {
     }
 
     private void invalidateResetToken(String token) {
-        redisTemplate.delete(RESET_TOKEN_PREFIX + token);
+        // CORRECCIÓN: Usar el key manager
+        redisTemplate.delete(redisKeyManager.getPasswordResetTokenKey(token));
     }
 }
